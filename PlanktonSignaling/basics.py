@@ -206,19 +206,11 @@ class Plankton(Background_Field):
                                       mod(xp - array([0,dx]),1)])
         dp = bspline.ev(p[:,:,0],p[:,:,1])
         
- #       dp = self.scalarInterp3([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
- #                                     mod(xp - array([0,dx]),1)])
         diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
         diffs = diffs.T
         
         return(diffs)
 
-    def scalarInterp3(self,p):
-        bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
-        p = array(p)
-        what = bspline.ev(p[:,:,0],p[:,:,1])
-        #what = what.reshape((4,len(p)/8))
-        return(what)
 
 
 
