@@ -10,7 +10,6 @@ from scipy.sparse.linalg import spsolve
 from numpy.random import rand
 import matplotlib.pyplot as plt
 import matplotlib.animation
-from scipy.interpolate import RectBivariateSpline
 
 class Background_Field(object):
     "A class that creates the background concentration field and evolves"
@@ -160,19 +159,8 @@ class Plankton(Background_Field):
         print('Exact deposition variance: {0:8.2e}, length scale: {1:8.2e}.  a2: {2:8.2e}.'.format(self.k*self.kappa,
                                                                                              sqrt(self.k*self.kappa),
                                                                                              self.depVar))
-        
-    def RT(self,pos,vel,c,grad_c):
-        # Actually, I need to do this as tumble and run, TR.
-        for j in range(0,len(pos)):
-            alpha = 1/(self.epsilon + sqrt(grad_c[j].dot(grad_c[j])*vel[j].dot(vel[j])))
-            if (rand() < self.k*self.lambda0*0.5*(1-alpha*grad_c[j].dot(vel[j]))):
-                th = rand()*2*pi
-                vel[j] = self.speed*array([cos(th),sin(th)])
-        for j in range(0,len(pos)):
-            pos[j] += self.k*vel[j]
-            pos[j] = mod(pos[j],1)
             
-    def RT2(self,pos,vel,c,grad_c):
+    def RT(self,pos,vel,c,grad_c):
         # Actually, I need to do this as tumble and run, TR.
         for j in range(0,len(pos)):
             alpha = 1/(self.epsilon + sqrt(dot(grad_c[j],grad_c[j])*dot(vel[j],vel[j])))
@@ -182,35 +170,11 @@ class Plankton(Background_Field):
         for j in range(0,len(pos)):
             pos[j] += self.k*vel[j]
             pos[j] = mod(pos[j],1)
-        
+    
     def Update(self,vectors,pos,vel):
         c      = self.scalarInterp(pos)
         grad_c = self.scalarGrad(pos)
         self.RT(pos,vel,c,grad_c)
-        
-        depStr = self.depFcn(c,self.depMaxStr,*self.args,**self.kwargs)
-        f = zeros((self.N,self.N))
-        for p,str in zip(pos,depStr):
-            f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
-            # Be cautious about periodic BC's.
-            # We capture periodic source emissions.
-            # Assumes a [0,1]x[0,1] domain.
-            if (p[0]<8*sqrt(self.depVar)):
-                f = f + str*exp(-((self.xm-p[0]-1)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
-            if (p[0]>1-8*sqrt(self.depVar)):
-                f = f + str*exp(-((self.xm-p[0]+1)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
-            if (p[1]<8*sqrt(self.depVar)):
-                f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]-1)**2)/4/self.depVar)/(4*pi*self.depVar)
-            if (p[1]>1-8*sqrt(self.depVar)):
-                f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]+1)**2)/4/self.depVar)/(4*pi*self.depVar)
-        f = f.reshape((self.N*self.N,))
-        self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*f)
-        return(self.scalar)
-    
-    def Update2(self,vectors,pos,vel):
-        c      = self.scalarInterp2(pos)
-        grad_c = self.scalarGrad2(pos)
-        self.RT2(pos,vel,c,grad_c)
         
         depStr = self.depFcn(c,self.depMaxStr,*self.args,**self.kwargs)
         f = zeros((self.N,self.N))
@@ -231,36 +195,30 @@ class Plankton(Background_Field):
         self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*f)
         return(self.scalar)
     
-    def scalarInterp(self,p):
-        return(griddata((self.xm.reshape(self.N**2,),self.ym.reshape(self.N**2,)),self.scalar,p,method='cubic'))
-
-    def scalarInterp2(self,pos):
+    def scalarInterp(self,pos):
         bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
         return(bspline.ev(pos[:,0],pos[:,1]))
-    
+
+    # Assumes a [0,1]x[0,1] domain.
+    def scalarGrad(self,xp,dx=1.0e-4):
+        bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
+        p       = array([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
+                                      mod(xp - array([0,dx]),1)])
+        dp = bspline.ev(p[:,:,0],p[:,:,1])
+        
+ #       dp = self.scalarInterp3([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
+ #                                     mod(xp - array([0,dx]),1)])
+        diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
+        diffs = diffs.T
+        
+        return(diffs)
+
     def scalarInterp3(self,p):
         bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
         p = array(p)
         what = bspline.ev(p[:,:,0],p[:,:,1])
         #what = what.reshape((4,len(p)/8))
         return(what)
-    
-    # Assumes a [0,1]x[0,1] domain.
-    def scalarGrad(self,xp,dx=1.0e-4):
-        dp = array(self.scalarInterp([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
-                                      mod(xp - array([0,dx]),1)]))
-        diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
-        diffs = diffs.T
-        return(diffs)
-    
-    def scalarGrad2(self,xp,dx=1.0e-4):
-        dp = self.scalarInterp3([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
-                                      mod(xp - array([0,dx]),1)])
-        diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
-        diffs = diffs.T
-        
-        return(diffs)
-
 
 
 
