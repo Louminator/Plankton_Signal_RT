@@ -1,15 +1,11 @@
-
 # coding: utf-8
 
 from scipy import *
 import scipy.sparse as sp
 import numpy as np
-from scipy.interpolate import griddata
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import spsolve
 from numpy.random import rand
-import matplotlib.pyplot as plt
-import matplotlib.animation
 
 class Background_Field(object):
     "A class that creates the background concentration field and evolves"
