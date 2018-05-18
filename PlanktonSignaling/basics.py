@@ -3,7 +3,7 @@
 from scipy import *
 import scipy.sparse as sp
 import numpy as np
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline,griddata
 from scipy.sparse.linalg import spsolve
 from numpy.random import rand
 
@@ -193,21 +193,44 @@ class Plankton(Background_Field):
     
     def scalarInterp(self,pos):
         bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
-        return(bspline.ev(pos[:,0],pos[:,1]))
+        
+        # Flipping x and y inputs because self.Meshed() has reversed row
+        # major formatting which goes back to meshgrid which goes back to
+        # Matlab's old mistake.
+        
+        # The alternative is to transpose Meshed.
+        
+        return(bspline.ev(pos[:,1],pos[:,0]))
 
     # Assumes a [0,1]x[0,1] domain.
     def scalarGrad(self,xp,dx=1.0e-4):
         bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
         p       = array([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
                                       mod(xp - array([0,dx]),1)])
-        dp = bspline.ev(p[:,:,0],p[:,:,1])
+
+        # Flipping x and y inputs because self.Meshed() has reversed row
+        # major formatting which goes back to meshgrid which goes back to
+        # Matlab's old mistake.
+        
+        # The alternative is to transpose Meshed.
+
+        dp = bspline.ev(p[:,:,1],p[:,:,0])
         
         diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
         diffs = diffs.T
         
         return(diffs)
 
+    def ORIGscalarInterp(self,p):
+        return(griddata((self.xm.reshape(self.N**2,),self.ym.reshape(self.N**2,)),self.scalar,p,method='cubic'))
 
+    # Assumes a [0,1]x[0,1] domain.
+    def ORIGscalarGrad(self,xp,dx=1.0e-4):
+        dp = array(self.scalarInterp([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
+                                      mod(xp - array([0,dx]),1)]))
+        diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
+        diffs = diffs.T
+        return(diffs)
 
 
 
