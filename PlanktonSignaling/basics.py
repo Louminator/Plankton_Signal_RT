@@ -232,5 +232,3 @@ class Plankton(Background_Field):
         diffs = diffs.T
         return(diffs)
 
-
-
