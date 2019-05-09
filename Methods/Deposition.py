@@ -7,9 +7,9 @@ def constantDep(c,depMaxStr,**kwargs):
     '''Constant deposition function'''
     return(array(depMaxStr*ones(len(c))))
 
-def atanDep(c,depMaxStr,depThreshold=0.08,depTransWidth=1/250,**kwargs):
+def atanDep(c,depMaxStr,depThreshold,depTransWidth,**kwargs):
     '''arctan (soft switch) transition function'''
-    return(depMaxStr/pi*(arctan((-c+depThreshold)/depTransWidth)+pi/2))
+    return(depMaxStr/pi*(arctan((-c+depThreshold)/depTransWidth)+(pi/2)))
 
 def linAtanDep(c,depMaxStr,depThreshold=0.08,depTransWidth=1/250,**kwargs):
     '''arctan (soft switch) transition function'''

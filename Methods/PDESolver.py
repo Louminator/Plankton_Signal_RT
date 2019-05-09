@@ -35,22 +35,25 @@ class Background_Field(object):
         self.BuildMatricies()
         
     def chebP(self):
-        
+        b = 2*pi
+        a = 0
+        N = self.N + 1
         #construct the Chebyshev differentiation matricies with respect to the length of the interval
         
-        h = (2*pi)/(self.N + 1) 
-        i = array( range(1,(self.N + 1)) )
+        h = (b-a)/N
+        #x = h*arange(1,N+1)
+        i = array( range(1,N) )
         column   = hstack(( [0.], .5*(-1)**i/tan(i*h/2.) ))
-        row      = hstack(( [0.], column[self.N:0:-1]       ))
+        row      = hstack(( [0.], column[N-1:0:-1]       ))
         D = toeplitz(column,row)
 
-        x = zeros(self.N + 1)
-        for i in range(0,self.N + 1):
-            x[i]= self.left + i*h
+        x = zeros(N)
+        for i in range(0,N):
+            x[i]= a + i*h
         
         self.D = D*self.CC # The first Chebyshev differentiation matrix 
         self.xm = x/self.CC # The spatial discretization array
-        self.D2 = D.dot(D) # The second Chebyshev differentiation matrix
+        self.D2 = self.D.dot(self.D) # The second Chebyshev differentiation matrix
      
     def BuildMatricies(self):
         
@@ -61,12 +64,12 @@ class Background_Field(object):
         self.P = self.I + (self.dt/2)*(self.d1*self.D2 - self.d2*self.I) 
         self.M = inv(self.I - (self.dt/2)*(self.d1*self.D2 - self.d2*self.I))
     
-        # Just For First Order System Plankton
+        # For First Order System Plankton
         self.I2 = eye(2*(self.N+1))
         self.D1 = np.vstack((np.hstack((self.D, self.D*0)), np.hstack((self.D*0,self.D))))
-        self.A = np.diag(np.append(-1*np.ones(self.N+1), np.ones(self.N+1)))
-        self.AD1 = self.A.dot(self.D1)
-    
+        self.O = np.diag(np.append(-1*np.ones(self.N+1), np.ones(self.N+1)))
+        self.AD1 = self.O.dot(self.D1)
+        
     def initial_conditionsFO(self,const=0.012, steps=3000):
         
         #First Order intial conditions
@@ -81,7 +84,7 @@ class Background_Field(object):
 
         # construct steady state from PDE 
         c[0,:] = 0*np.linspace(0,10,self.N + 1) + const
-        a = self.d2*const/(self.depFcn(const,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs))
+        a = self.d2*c[0,:]/(self.depFcn(c[0,:],self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs))
         
         p[0,:] = a/2
         q[0,:] = a/2
@@ -128,9 +131,9 @@ class PlankChem(Background_Field):
         # First Order Method
         # Perturb the constant solutions
         
-        cn = ck + 0.00016*cos(2*self.CC*self.xm)
-        pn = pk - 0.00014*cos(2*self.CC*self.xm)
-        qn = qk + 0.00005*cos(2*self.CC*self.xm)
+        cn = ck + 0.00016*cos(self.LP*self.CC*self.xm)
+        pn = pk - 0.00014*cos(self.LP*self.CC*self.xm)
+        qn = qk + 0.00005*cos(self.LP*self.CC*self.xm)
         
         totalc, totalp, totalq = self.totalsF(cn,pn,qn)
         
@@ -140,18 +143,17 @@ class PlankChem(Background_Field):
         # Second Order Method 
         # Perturb the constant solutions 
 
-        cn = ck + 0.00016*cos(2*self.CC*self.xm)
-        pn = pk - 0.00009*cos(2*self.CC*self.xm)
+        cn = ck + 0.00016*cos(self.LP*self.CC*self.xm)
+        pn = pk - 0.00009*cos(self.LP*self.CC*self.xm)
         
         totalc, totalp = self.totals(cn,pn)
         
         return(cn,pn,totalc,totalp)
-    
+        
     def FirstOrder(self,ck,pk,qk):
         #this is the updating scheme for the first order equation#
         #We utilize a Crank-Nicolson scheme for both the chemical and plankton, but using a psuedospectral scheme#
         #We compute the change in the chemical first and then use this to perform the next evolution of the plankton#
-        
         
         #timestep for chemical
         F = np.multiply(pk+qk,self.depFcn(ck,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs))
@@ -164,7 +166,7 @@ class PlankChem(Background_Field):
         
         if (self.delta == 0): #this is to prevent any division by zero
             SGN = np.sign(self.D.dot(ck))  
-            SGN1 = np.sign(self.D.dot(ck1))
+            SGN1 = np.sign(self.D.dot(cn))
         else:
             SGN = np.divide(self.D.dot(ck),sqrt(np.multiply(self.D.dot(ck),self.D.dot(ck))+self.delta**2))
             SGN1 = np.divide(self.D.dot(cn),sqrt(np.multiply(self.D.dot(cn),self.D.dot(cn))+self.delta**2))
@@ -186,9 +188,9 @@ class PlankChem(Background_Field):
         
         
         #Finish off the method by inverting the proper matrix
-        K = (self.I2 + (self.dt/2)*(self.AD1 + Hn))
+        K = (self.I2 + (self.dt/2)*(self.AD1 + (1/2)*Hn))
         K1 = K.dot(PSI)
-        PSIN = inv(self.I2 - (self.dt/2)*(self.AD1 + Hn1)).dot(K1)
+        PSIN = inv(self.I2 - (self.dt/2)*(self.AD1 + (1/2)*Hn1)).dot(K1)
 
         pn = PSIN[:len(PSIN)//2]
         qn = PSIN[len(PSIN)//2:]
@@ -212,13 +214,14 @@ class PlankChem(Background_Field):
 
         #calculate next timestep for p
         if (self.delta==0): #prevent possible division by 0
-            first = np.multiply(np.sign(D.dot(ck)),pk)
-        else:  
+            first = np.multiply(np.sign(self.D.dot(ck)),pk)
+        else:
             first = np.multiply(np.divide(self.D.dot(ck),sqrt(np.multiply(self.D.dot(ck),self.D.dot(ck))+self.delta**2)),pk)
             
         mp = self.D.dot(first)
         fp = (self.dt**2)*(self.D2.dot(pk) - mp)
-        pn = (1/(1 + self.dt/2))*(fp + 2*pk + (self.dt/2 - 1)*pk1)
+        IL = inv(self.I + (self.dt/2)*self.I)
+        pn = IL.dot(fp + 2*pk + (self.dt/2 - 1)*pk1)
            
         #compute the sum of total chemical and plankton
         C,P = self.totals(cn,pn)
@@ -251,4 +254,45 @@ class PlankChem(Background_Field):
             totalq = H*self.dx + totalq
             totalc = Z*self.dx + totalc
         return(totalc, totalp, totalq)
+    
+    def CheckStability(self,c0):
         
+        # This function checks the stability of the steady state solution, where c0 is the constant value of the #
+        # chemical. This analysis performed works for both the FO and SO equations, and is derived from a #
+        # fourier analysis of the system, along with a perturbation. #
+        
+        if (self.delta == 0):
+            print('These parameters make the system unstable. Most Unstabe Wave Number: Infinity')
+            self.LP = 1
+        else:
+            wave = linspace(0,100,3000)
+            stable = 0
+            max0 = 0
+            f0 = self.depFcn(c0,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
+            f1 = self.depFcn(c0+0.0001,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
+            f2 = self.depFcn(c0-0.0001,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)           
+            
+            d2 = self.d2        
+            p = d2*c0/f0
+            fp = (f1 - f2)/(2*0.0001)
+            d4 = p*fp - d2
+            
+            for f in range(0,len(wave)):
+                k = wave[f]
+                c1 = self.d1*k**2 - d4 + 1
+                c2 = (self.d1 + 1)*k**2 - d4
+                c3 = k**2*(self.d1*k**2 - d4 - c0*d2/self.delta)
+                coeff = [1,c1,c2,c3]
+                roots = np.roots(coeff)
+                for m in range(0, len(roots)):
+                    roo = roots[m]
+                    if (roo.real > max0):
+                        max0=roo.real
+                        stable = k
+            if (stable >= 1/(self.CC)):
+                print('These parameters make the system unstable. Most Unstable Wave Number: {0}'.format(round(stable,3)))
+            else:
+                print('These parameters make the system stable.')
+            
+            #Gives a number to perturb the system
+            self.LP = math.ceil(stable) 
