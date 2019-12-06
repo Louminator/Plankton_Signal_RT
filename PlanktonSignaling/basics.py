@@ -26,7 +26,7 @@ class Background_Field(object):
         for counter in range(0,self.N-1):
             self.scalar = np.append(self.scalar,self.x)
         
-        self.h = self.x[1]-self.x[0] # spacial mesh size
+        self.h = self.x[1]-self.x[0] # spatial mesh size
         self.SetAlpha()
         self.BuildMatrixA1()
         self.BuildMatrixA2()
