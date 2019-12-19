@@ -12,16 +12,18 @@ class Background_Field(object):
     "A class that creates the background concentration field and evolves"
     
     # class builder initiation 
-    def __init__(self,N=30,kappa=1.0e-4,beta=1.0e0,k=0.1,Const=6,*args,**kwargs):
+    def __init__(self,N=30,kappa=1.0e-4,beta=1.0e0,k=0.1,Const=6,L=10,*args,**kwargs):
                 
         self.N = N # The number of mesh points
         self.kappa = kappa
         self.beta  = beta
         self.k     = k*self.lambda0 # k is delta t
+        self.L     = L
         
         self.d1 = self.kappa*self.lambda0/self.speed**2
         self.d2 = self.beta/self.lambda0
-        self.L = self.lambda0/self.speed
+        #self.L = self.lambda0/self.speed
+        self.L = L
         self.depVar = Const*self.k*self.d1       #Deposition variable (Gaussian deposition)
         
         self.x = r_[0:self.L:1j*self.N]# setup the spatial mesh. It is a long row vector
@@ -173,9 +175,9 @@ class Plankton(Background_Field):
         f = zeros((self.N,self.N))
         for p,str in zip(pos,depStr):
             f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
-            # Be cautious about periodic BC's.
-            # We capture periodic source emissions.
-            # Assumes a [0,1]x[0,1] domain.
+            # We must be cautious about Periodic BCs
+            # This code includes the previously missing diagonal element
+            # Works for all domains [0,L] x [0,L]
             if ((p[0])**2<64*self.depVar):
                 f = f + str*exp(-((self.xm-p[0]-self.L)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
             if ((p[0]-self.L)**2<64*self.depVar):
