@@ -178,11 +178,11 @@ class Plankton(Background_Field):
             # Assumes a [0,1]x[0,1] domain.
             if ((p[0])**2<64*self.depVar):
                 f = f + str*exp(-((self.xm-p[0]-self.L)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
-            if ((p[0]-self.L)**2>64*self.depVar):
+            if ((p[0]-self.L)**2<64*self.depVar):
                 f = f + str*exp(-((self.xm-p[0]+self.L)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
             if ((p[1])**2<64*self.depVar):
                 f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]-self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
-            if ((p[1]-self.L)**2>64*self.depVar):
+            if ((p[1]-self.L)**2<64*self.depVar):
                 f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]+self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
         f = f.reshape((self.N*self.N,))
         self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*(400/self.num)*f)
