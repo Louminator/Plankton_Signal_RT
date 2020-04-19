@@ -1,0 +1,128 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python}
+from scipy import *
+import numpy as np
+from numpy.random import rand
+import matplotlib.pyplot as plt
+import matplotlib.animation
+import PlanktonSignaling.basics as PS
+import profile
+
+# %matplotlib notebook
+
+```
+
+```{python}
+def constantDep(c,depMaxStr,**kwargs):
+    '''Constant deposition function'''
+    return(array(depMaxStr*ones(len(c))))
+
+def atanDep(c,depMaxStr,depThreshold=0.08,depTransWidth=1/250,**kwargs):
+    '''arctan (soft switch) transition function'''
+
+    return(depMaxStr/pi*(arctan((-c+depThreshold)/depTransWidth)+pi/2))
+
+def linAtanDep(c,depMaxStr,depThreshold=0.08,depTransWidth=1/250,**kwargs):
+    '''arctan (soft switch) transition function'''
+
+    return(depMaxStr/pi*(c+0.1*depThreshold)/1.1/depThreshold*(arctan((-c+depThreshold)/depTransWidth)+pi/2))
+
+```
+
+```{python}
+meshsize = 40
+print('Mesh length scale: {0:8.2e}'.format(1/meshsize))
+Swimmers = PS.Plankton(linAtanDep,N = meshsize,depMaxStr=2.0e-4,depVar=4.0e-4,k=0.02,speed=0.05,
+                    lambda0=1.0,kappa=6.4e-3,beta=0.25,depTransWidth=0.001,depThreshold=0.08)
+
+def initial_conditions(x,y):
+    return(0*x)
+
+Swimmers.SetBeta(1.0)
+
+```
+
+```{python}
+Swimmers.SetIC(initial_conditions)
+
+pos = [array([0.1,0.1])]
+th = rand()*2*pi
+vel = [Swimmers.speed*array([cos(th),sin(th)])]
+for l in range(0,19):
+    for k in range(0,19):
+        pos = np.append(pos,[array([k*0.05 + 0.01*(rand()-0.5) + 0.05,
+                                  l*0.05 + 0.01*(rand()-0.5) + 0.05])],axis=0)
+        th  = rand()*2*pi
+        vel = np.append(vel,[Swimmers.speed*array([cos(th),sin(th)])],axis=0)
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm,Swimmers.ym,Swimmers.Meshed())
+plt.plot(pos[:,0],pos[:,1],'ro')
+plt.colorbar()
+plt.show()
+```
+
+```{python}
+Swimmers.scalar = sin(Swimmers.xm*5*pi)*cos(Swimmers.ym*3*pi)
+Swimmers.scalar=reshape(Swimmers.scalar,(1600,1))
+```
+
+```{python}
+plt.figure()
+plt.contour(Swimmers.xm,Swimmers.ym,Swimmers.Meshed())
+plt.show()
+```
+
+Notice the difference in shapes.
+
+```{python}
+print(shape(Swimmers.ORIGscalarInterp(pos)))
+print(shape(Swimmers.scalarInterp(pos)))
+```
+
+Notice this looks all wrong.  It's because the shape of the interpolation is (362,1) and the shape of the test function is (362,).  The result is (362,362) and is complete nonsense.
+
+```{python}
+(Swimmers.ORIGscalarInterp(pos)-sin(pos[:,0]*5*pi)*cos(pos[:,1]*3*pi))
+```
+
+Here's the fix.  Just reshape the interpolation.
+
+```{python}
+(Swimmers.ORIGscalarInterp(pos)[:,0]-sin(pos[:,0]*5*pi)*cos(pos[:,1]*3*pi))
+```
+
+Notice that scalarInterp returns the transpose of the test function.
+
+```{python}
+plt.figure()
+plt.subplot(221)
+plt.tricontourf(pos[:,0],pos[:,1],sin(pos[:,0]*5*pi)*cos(pos[:,1]*3*pi))
+plt.colorbar()
+plt.subplot(222)
+plt.tricontourf(pos[:,0],pos[:,1],Swimmers.ORIGscalarInterp(pos)[:,0])
+plt.colorbar()
+plt.subplot(223)
+plt.tricontourf(pos[:,0],pos[:,1],Swimmers.ORIGscalarInterp(pos)[:,0]-sin(pos[:,0]*5*pi)*cos(pos[:,1]*3*pi))
+plt.colorbar()
+plt.subplot(224)
+plt.tricontourf(pos[:,0],pos[:,1],Swimmers.scalarInterp(pos))
+plt.show()
+```
+
+```{python}
+
+```

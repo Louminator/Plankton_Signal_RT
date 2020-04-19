@@ -1,0 +1,414 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python}
+from scipy import *
+import numpy as np
+from numpy.random import rand
+import matplotlib.pyplot as plt
+import matplotlib.animation
+import profile
+
+import scipy.sparse as sp
+from scipy.optimize import broyden1
+from scipy.interpolate import RectBivariateSpline,griddata
+from scipy.sparse.linalg import spsolve
+from numpy.random import rand, uniform
+from numpy.linalg import inv
+from scipy.linalg import toeplitz
+
+# %matplotlib notebook
+
+# #%load_ext Cython
+```
+
+```{python}
+#Compute the periodic differentiation matrix from Trefethan
+
+def chebP(N,a,b):
+    h = (b-a)/N
+    #x = h*arange(1,N+1)
+    i = array( range(1,N) )
+    column   = hstack(( [0.], .5*(-1)**i/tan(i*h/2.) ))
+    row      = hstack(( [0.], column[N-1:0:-1]       ))
+    D = toeplitz(column,row)
+    
+    x = zeros(N)
+    for i in range(0,N):
+        x[i]= a + i*h
+    return(D,x)
+
+#deposition function
+def atanDep(c,depMaxStr,c0,depTransWidth):
+    '''arctan (soft switch) transition function'''
+    return(depMaxStr/pi*(arctan((-c+c0)/depTransWidth)+(pi/2)))
+    #return(0.001)
+    
+def atanDepder(c,depMaxStr,c0,depTransWidth):
+    '''arctan (soft switch) transition function'''
+    return(-1*(depMaxStr/pi)*(depTransWidth)/((c0-c)**2 + (depTransWidth)**2))
+
+def linAtanDep(c,depMaxStr,depThreshold=0.08,depTransWidth=1/250,**kwargs):
+    '''arctan (soft switch) transition function'''
+    return(depMaxStr/pi*(c+0.1*depThreshold)/1.1/depThreshold*(arctan((-c+depThreshold)/depTransWidth)+pi/2))
+```
+
+<!-- #region -->
+We consider the non-dimensional coupled nonlinear PDE system:
+
+
+$c_t = d_1 c_{xx} - d_2 c + d_3 f(c) \rho $
+
+$\psi_t^+ = - \psi_x^+ - \frac{1}{2} \left( 1- \frac{c_x}{|c_x|} \right) \psi^+ + \frac{1}{2} \left( 1 + \frac{c_x}{|c_x|} \right) \psi^- $
+
+$\psi_t^- = \psi_x^- + \frac{1}{2} \left( 1- \frac{c_x}{|c_x|} \right) \psi^+ - \frac{1}{2} \left( 1 + \frac{c_x}{|c_x|} \right) \psi^-$
+
+
+We now attempt to discretize this PDE using spectral Chebyshev differentiation matricies for the derivatives in $x$, Crank-Nicolson time-stepping procedure for $c$ and $\rho$. 
+<!-- #endregion -->
+
+```{python}
+#Parameters
+dt = .002 #ime stepping side
+steps = 11000 #number of time steps
+left = 0 #left end point
+right = 3 #ight end point
+c0 = .05 #chemical threshold
+delta = 6e-3 #approximating |c_x| as sqrt(cx^2 + delta^2)
+Dc = right-left #length of domain
+N = 167 #number of nodes
+d1 = 2 #diffusion, d1
+d2 = 1  #decay, d2
+d3 = 1 #auto-chemotaxis d3
+CC = (2*pi)/Dc #length scale
+
+dx = Dc/N #mesh size
+
+CFL = dt/dx #CFL condition
+```
+
+We will solve for $\psi^+$ and $\psi^-$, and then compute $\rho = \psi^+ + \psi^-$ at the end. 
+
+```{python}
+#second derivative Matrix
+D, x = chebP(N+1, 0, 2*pi) #Differentiation matrix
+D = CC*D #Scale for length
+x = x/CC #rescale the x-coordinates
+D2 = D.dot(D) #2nd derivative matrix
+I = eye(N+1)
+I2 = eye(2*(N+1))
+D1 = np.vstack((np.hstack((D, D*0)), np.hstack((D*0,D)))) #Differentiation Matrix for the System
+A = np.diag(np.append(-1*np.ones(N+1), np.ones(N+1)))
+AD1 = A.dot(D1) #Advection Term for C.N. 
+
+#set up c matricies
+P = I + (dt/2)*(d1*D2 - d2*I) 
+M = inv(I - (dt/2)*(d1*D2 - d2*I))
+
+#chemical concentration c 
+c = zeros((steps,N+1))
+
+#density psi+ and psi-, the right and left moving waves
+p = zeros((steps,N+1)) #right moving
+q = zeros((steps,N+1)) #left moving
+
+#test integration
+totalpv = p[:,0]*0
+totalqv = q[:,0]*0
+totalcv = c[:,0]*0
+
+#itialize c and rho from constant steady state
+c[0,:] = 0.012
+
+a = (d2*c[0,:]/(d3*atanDep(c[0,:],.01,c0,.03)))
+p[0,:] = a/2
+q[0,:] = a/2 
+
+totalp = 0
+totalc = 0
+totalq = 0
+for j in range(1,len(x)):
+    R = (p[0,j]+p[0,j-1])/2
+    Q = (q[0,j]+q[0,j-1])/2
+    Z = (c[0,j]+c[0,j-1])/2 
+    totalp = R*dx + totalp
+    totalq = Q*dx + totalq
+    totalc = Z*dx + totalc
+totalpv[0] = totalp
+totalcv[0] = totalc
+totalqv[0] = totalq
+
+#Perturb the beginning solution
+c[1,:] = c[0,:] + 0.00016*cos(2*CC*x)
+p[1,:] = p[0,:] - 0.00014*cos(2*CC*x)
+q[1,:] = q[0,:] + 0.00005*cos(2*CC*x)
+
+totalp = 0
+totalc = 0
+totalq = 0
+for j in range(1,len(x)):
+    R = (p[1,j]+p[1,j-1])/2
+    Q = (q[1,j]+q[1,j-1])/2
+    Z = (c[1,j]+c[1,j-1])/2 
+    totalp = R*dx + totalp
+    totalq = Q*dx + totalq
+    totalc = Z*dx + totalc
+totalpv[1] = totalp
+totalcv[1] = totalc
+totalqv[1] = totalq
+```
+
+<!-- #region -->
+Our scheme can be written as follows: 
+
+
+$c^{n + 1} = \left[ I  - (\Delta t/2) \left( d_1 D^2 - d_2 I \right) \right]^{-1} \left[ \left( I  + (\Delta t/2) \left( d_1 D^2 - d_2 I \right) \right) c^n + \Delta t d_3 f(c^n) \rho^n \right]$ 
+
+$\Psi^{n+1} = \left(I - (\Delta t/2)(A_1 + H^{n+1} \right) \left(I + (\Delta t/2)(A_1 + H^n \right)\Psi^n$
+
+where
+
+$\Psi^{n} = \begin{bmatrix}
+\Psi^+ \\
+\Psi^-
+\end{bmatrix}, \hspace{2mm}
+A_1 = \begin{bmatrix}
+-1 & & & & & & &  \\
+ & -1 & & & & & &\\
+ & & \ddots & & & & & \\
+ & & & -1 & & & & \\
+ & & & & 1 & & & \\
+ & & & & & 1& & \\
+ & & & & & & \ddots & \\
+ & & & & & & & 1
+\end{bmatrix}
+\begin{bmatrix}
+D & 0 \\
+0 & D
+\end{bmatrix}$
+and $H^n$ controls the sign change terms with $\text{sgn}(c_x)$
+<!-- #endregion -->
+
+```{python}
+for k in range(2,steps):
+    ck = c[k-1,:]
+    pk = p[k-1,:]
+    qk = q[k-1,:]
+    PSI = np.append(pk,qk)
+    
+    
+    #calculate the next timestep for c
+    
+    cp = dt*d3*np.multiply(pk+qk,atanDep(ck,.01,c0,.03))
+    B = P.dot(ck) + cp
+    c[k,:] = M.dot(B)
+    ck1 = c[k,:]
+
+    #calculate the next timestep for psi+ and psi - 
+    
+    
+    #construct sign function by aproximating it with cx/sqrt(cx^2 + delta^2)
+    SGN = np.divide(D.dot(ck),sqrt(np.multiply(D.dot(ck),D.dot(ck))+delta**2))
+    SGN1 = np.divide(D.dot(ck1),sqrt(np.multiply(D.dot(ck1),D.dot(ck1))+delta**2)) 
+    #SGN = np.sign(D.dot(ck))
+    #SGN1 = np.sign(D.dot(ck1))
+    
+    #Construct the Hn matrix
+    C1 = np.diag(np.ones(len(ck)) - SGN)
+    C2 = np.diag(np.ones(len(ck)) + SGN)
+    C3 = -1*C1
+    C4 = -1*C2
+    
+    Hn = np.vstack((np.hstack((C3, C2)),np.hstack((C1,C4))))
+    
+    #Construct the Hn1 matrix
+    C1 = np.diag(np.ones(len(ck)) - SGN1)
+    C2 = np.diag(np.ones(len(ck)) + SGN1)
+    C3 = -1*C1
+    C4 = -1*C2
+    
+    Hn1 = np.vstack((np.hstack((C3, C2)),np.hstack((C1,C4))))
+    
+    #Finally construct Psi^(n+1) and separate the psi+ and psi- entries
+    K = (I2 + (dt/2)*(AD1 + Hn))
+    K1 = K.dot(PSI)
+    
+    PSIN = inv(I2 - (dt/2)*(AD1 + Hn1)).dot(K1)
+    
+    p[k,:] = PSIN[:len(PSIN)//2]
+    q[k,:] = PSIN[len(PSIN)//2:]
+    
+    
+    #Calcualte the total plankton and chemical in the system
+    totalp = 0
+    totalc = 0
+    totalq = 0
+    for j in range(1,len(x)):
+        R = (p[k,j]+p[k,j-1])/2
+        Q = (q[k,j]+q[k,j-1])/2
+        Z = (c[k,j]+c[k,j-1])/2 
+        totalp = R*dx + totalp
+        totalq = Q*dx + totalq
+        totalc = Z*dx + totalc
+    totalpv[k] = totalp
+    totalcv[k] = totalc
+    totalqv[k] = totalq
+```
+
+## Plot the Results
+
+```{python}
+#Plot the results of rho
+
+time = round(steps/3 - 1)
+fig, ax1 = plt.subplots() #put rho and c on the same figure
+
+ax1.set_xlabel(r'$x$')
+ax1.set_ylabel(r'$\rho$: Plankton Density', color=color)
+ax1.plot(x,q[time*0,:] + p[time*0,:], color='black', label='Time = 0')
+ax1.plot(x,q[time*1,:] + p[time*1,:], color='blue', label='Time = {0}'.format(round(time*dt,3)))
+ax1.plot(x,q[time*2,:] + p[time*2,:], color='green',label='Time = {0}'.format(round(time*dt*2,3)))
+ax1.plot(x,q[time*3,:] + p[time*3,:] , color='red',label='Time = {0}'.format(round(time*dt*3,3)))
+ax1.tick_params(axis='y', labelcolor='black')
+
+ax1.set_xlim(left, right)
+plt.title(r'Achieved Steady State for Plankton Density')
+plt.title(r'$\rho = \psi^+ + \psi^-$, atanDep, $d_1$: {0}, $d_2$: {1}, $d_3$: {2}, $N$: {3}, $\delta$: {4}'.format(round(d1,2), round(d2,2), d3, N, delta))
+plt.legend(loc='best')
+plt.show()
+```
+
+```{python}
+#plot the results of the left and right moving plankton
+
+fig, ax1 = plt.subplots() #put rho and c on the same figure
+
+color = 'red'
+ax1.set_xlabel(r'$x$')
+ax1.set_ylabel(r'Right moving', color=color)
+ax1.plot(x,p[time,:] , color='blue', label='RM, T = {0}'.format(round(time*dt,1)))
+ax1.plot(x,p[time*2,:], color='green', label='RM, T = {0}'.format(round(time*dt*2,1)))
+ax1.plot(x,p[time*3,:], color='red', label='RM, T= {0}'.format(round(time*dt*3,1)))
+ax1.tick_params(axis='y', labelcolor=color)
+ax1.legend(loc=1)
+
+ax2 = ax1.twinx()  #create a second axes that shares the same x-axis
+color = 'orange'
+ax2.set_ylabel(r'Left Moving', color=color) 
+ax2.plot(x, q[time*1,:], color='pink', label='LM, T = {0}'.format(round(time*dt*1,1))) 
+ax2.plot(x, q[time*2,:], color='black', label='LM, T = {0}'.format(round(time*dt*2,1))) 
+ax2.plot(x, q[time*3,:], color='orange', label='LM, T = {0}'.format(round(time*dt*3,1)))
+
+
+ax1.set_xlim(left, right)
+plt.title(r'Left and Right Moving: $d_1$: {0}, $d_2$: {1}, $d_3$: {2}'.format(round(d1,2), round(d2,2), d3, round(time*dt,3)))
+fig.tight_layout()  # otherwise the right y-label is slightly clipped
+
+ax1.legend(loc=1)
+ax2.legend(loc=2)
+
+plt.show()
+```
+
+```{python}
+#plot the chemical over time
+
+fig, ax2 = plt.subplots() 
+
+color = 'blue'
+ax2.set_ylabel(r'$c$: Chemical Concentration', color=color) 
+ax2.plot(x, c[0,:], color='black', label='Time = {0}'.format(round(time*0,3)))
+ax2.plot(x, c[time,:], color=color, label='Time = {0}'.format(round(time*dt,3)))
+ax2.plot(x, c[time*2,:], color='green', label='Time = {0}'.format(round(time*dt*2,3))) 
+ax2.plot(x, c[time*3,:],color='red', label='Time = {0}'.format(round(time*dt*3,3)))
+#ax2.set_ylim(0,.11)
+
+
+ax2.set_xlim(left, right)
+plt.title(r'Achieved Steady State for Chemical Concentration')
+plt.title(r'Steady State, atanDep, $d_1$: {0}, $d_2$: {1}, $d_3$: {2}, N: {3}, $\delta$: {4}'.format(d1, d2, d3, N, delta))
+fig.tight_layout()  # otherwise the right y-label is slightly clipped
+plt.legend()
+plt.show()
+```
+
+```{python}
+#plot the total amount of chemical and plankton over time, normalized from the starting amount
+
+plt.figure()
+
+totalrhov = totalpv + totalqv
+timee = linspace(0,steps*dt,steps)
+plt.plot(timee, (totalcv/totalcv[0])*100)
+plt.plot(timee, (totalrhov/totalrhov[0])*100)
+plt.title(r'Plankton over Time, $d_1$: {0}, $d_2$: {1}, $d_3$: {2}, $\delta$: {4}'.format(round(d1,2), round(d2,2), d3, N, delta))
+#fig.tight_layout()  # otherwise the right y-label is slightly clipped
+plt.legend(('Chemical','Plankton'), loc=0)
+plt.xlabel('Time')
+plt.ylabel('Percentage Left')
+plt.show()
+```
+
+### Animation
+
+```{python}
+import matplotlib.animation as animation
+
+fig, ax1 = plt.subplots()
+time = 0
+
+line, = ax1.plot(x,q[time,:] + p[time,:], color='blue', label='Time = {0}'.format(round(time*dt,3)))
+ax1.set_xlabel(r'$x$')
+ax1.set_ylabel(r'Plankton', color='blue')
+ax1.set_xlim(left, right)
+
+ax2 = ax1.twinx()  #create a second axes that shares the same x-axis
+line2, = ax2.plot(x, c[time,:], color='red', label='Time = {0}'.format(round(time*dt,3)))
+ax2.set_ylabel(r'Chemical Concentration', color='red')
+ax2.set_xlim(left, right)
+fig.tight_layout()
+
+
+def init():  # only required for blitting to give a clean slate.
+    line.set_ydata([np.nan] * len(x))
+    line2.set_ydata([np.nan] * len(x))
+    return line,
+
+
+def animate(i):
+    line.set_ydata(q[i,:] + p[i,:])  # update the data.
+    M = max(q[i,:] + p[i,:])
+    m = min(q[i,:] + p[i,:])
+    
+    if (M-m != 0):
+        ax1.set_ylim(m-1, M+1)
+    line2.set_ydata(c[i,:])  # update the data.
+    
+    M = max(c[i,:])
+    m = min(c[i,:])
+    if (M-m != 0):
+        ax2.set_ylim(m -.0001, M +0.0001)
+    
+    plt.title(r'Plankton/Chemical, Time = {4}, $d_1$: {0}, $d_2$: {1}, $d_3$: {2}, $N$: {3}'.format(round(d1,2), round(d2,2), d3, N, round(i*dt,3)))
+    return line, line2,
+
+
+ani = animation.FuncAnimation(
+    fig, animate, init_func=init, interval=2, blit=True, save_count=steps)
+
+
+ani.save("Delta 1e-2.mp4")
+
+#plt.show()
+```
