@@ -1,22 +1,32 @@
 # coding: utf-8
 
 from scipy import *
+from math import acos, asin
 import scipy.sparse as sp
 import numpy as np
 from scipy.interpolate import RectBivariateSpline,griddata
 from scipy.sparse.linalg import spsolve
-from numpy.random import rand
+from numpy.random import rand, uniform
 
 class Background_Field(object):
     "A class that creates the background concentration field and evolves"
     
     # class builder initiation 
-    def __init__(self,N=30,kappa=1.0e-4,beta=1.0e0,k=0.1,*args,**kwargs):
+    def __init__(self,N=30,kappa=1.0e-4,beta=1.0e0,k=0.1,Const=6,L=10,*args,**kwargs):
+                
         self.N = N # The number of mesh points
         self.kappa = kappa
         self.beta  = beta
-        self.k     = k # k is delta t
-        self.x = r_[0:1:1j*self.N]# setup the spatial mesh. It is a long row vector
+        self.k     = k*self.lambda0 # k is delta t
+        self.L     = L
+        
+        self.d1 = self.kappa*self.lambda0/self.speed**2
+        self.d2 = self.beta/self.lambda0
+        #self.L = self.lambda0/self.speed
+        self.L = L
+        self.depVar = Const*self.k*self.d1       #Deposition variable (Gaussian deposition)
+        
+        self.x = r_[0:self.L:1j*self.N]# setup the spatial mesh. It is a long row vector
 
         # Create some local coordinates for the square domain.
         self.y = 1*self.x
@@ -52,26 +62,17 @@ class Background_Field(object):
         
     # Compute alpha
     def SetAlpha(self):
-        self.alpha = self.kappa*self.k/self.h/self.h
-        self.BuildMatrixA1()
-        self.BuildMatrixA2()
-        self.BuildMatrices()
-        
-    def SetBeta(self,beta):
-        self.beta = beta
-        self.BuildMatrixA1()
-        self.BuildMatrixA2()
-        self.BuildMatrices()
+        self.alpha = self.d1*self.k/(self.h)**2
         
     # Build the N x N matrix A1 for 1-Dimensional Crank-Nicoleson Method
     def BuildMatrixA1(self):
-        diag = ones(self.N)*(1+4*self.alpha/2+self.k*self.beta/2)
+        diag = ones(self.N)*(1+4*self.alpha/2+self.k*self.d2/2)
         data = np.array([-ones(self.N)*self.alpha/2,-ones(self.N)*self.alpha/2,
                          diag, -ones(self.N)*self.alpha/2,-ones(self.N)*self.alpha/2]) #off-diag and corners are -alpha
         self.A1 = sp.spdiags(data,[1-self.N,-1,0,1,self.N-1],self.N,self.N)
         
     def BuildMatrixA2(self):
-        diag = ones(self.N)*(1-4*self.alpha/2-self.k*self.beta/2)
+        diag = ones(self.N)*(1-4*self.alpha/2-self.k*self.d2/2)
         data = np.array([ones(self.N)*self.alpha/2, ones(self.N)*self.alpha/2,
                          diag, ones(self.N)*self.alpha/2, ones(self.N)*self.alpha/2]) #off-diag and corners are alpha
         self.A2 = sp.spdiags(data,[1-self.N,-1,0,1,self.N-1],self.N,self.N)
@@ -138,57 +139,78 @@ class Background_Field(object):
 
 class Plankton(Background_Field):
     
-    def __init__(self,depFcn,lambda0=1e0,speed=0.1,depMaxStr=1.0e-10,depVar=1.0e-5,epsilon=1.0e-8,*args,**kwargs):
+    def __init__(self,depFcn,lambda0=1e0,speed=0.1,depMaxStr=1.0e-10,epsilon=1.0e-8,depTransWidth=0.001,depThreshold=0.008,dens=4,*args,**kwargs):
 
         self.lambda0 = lambda0
         self.speed = speed
         self.depMaxStr = depMaxStr #Deposition maximum strength
-        self.depVar = depVar       #Deposition variable (Gaussian deposition)
         self.depFcn = depFcn
+        self.depTransWidth = depTransWidth
+        self.depThreshold = depThreshold
+        self.density = dens
         self.args = args
         self.kwargs = kwargs
         
         self.epsilon = epsilon
 
         super(Plankton,self).__init__(*args,**kwargs)
-
-        print('Exact deposition variance: {0:8.2e}, length scale: {1:8.2e}.  a2: {2:8.2e}.'.format(self.k*self.kappa,
-                                                                                             sqrt(self.k*self.kappa),
-                                                                                             self.depVar))
             
     def RT(self,pos,vel,c,grad_c):
         # Actually, I need to do this as tumble and run, TR.
         for j in range(0,len(pos)):
             alpha = 1/(self.epsilon + sqrt(dot(grad_c[j],grad_c[j])*dot(vel[j],vel[j])))
-            if (rand() < self.k*self.lambda0*0.5*(1-alpha*dot(vel[j],grad_c[j]))):
+            if (rand() < self.k*0.5*(1-alpha*dot(vel[j],grad_c[j]))):
                 th = rand()*2*pi
-                vel[j] = self.speed*array([cos(th),sin(th)])
+                vel[j] = array([cos(th),sin(th)])
         for j in range(0,len(pos)):
             pos[j] += self.k*vel[j]
-            pos[j] = mod(pos[j],1)
-    
+            pos[j] = mod(pos[j],self.L)
+            
     def Update(self,vectors,pos,vel):
         c      = self.scalarInterp(pos)
         grad_c = self.scalarGrad(pos)
         self.RT(pos,vel,c,grad_c)
         
-        depStr = self.depFcn(c,self.depMaxStr,*self.args,**self.kwargs)
+        depStr = self.depFcn(c,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
         f = zeros((self.N,self.N))
         for p,str in zip(pos,depStr):
+            
+            A = 0
+            B = 0
+            C = 0
+            D = 0
+            
             f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
-            # Be cautious about periodic BC's.
-            # We capture periodic source emissions.
-            # Assumes a [0,1]x[0,1] domain.
+            # We must be cautious about Periodic BCs
+            # This code includes the previously missing diagonal element
+            # Works for all domains [0,L] x [0,L]
             if ((p[0])**2<64*self.depVar):
-                f = f + str*exp(-((self.xm-p[0]-1)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
-            if ((p[0]-1)**2>64*self.depVar):
-                f = f + str*exp(-((self.xm-p[0]+1)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
+                f = f + str*exp(-((self.xm-p[0]-self.L)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
+                A = 1
+                
+            if ((p[0]-self.L)**2<64*self.depVar):
+                f = f + str*exp(-((self.xm-p[0]+self.L)**2+(self.ym-p[1])**2)/4/self.depVar)/(4*pi*self.depVar)
+                B = 1
+                
             if ((p[1])**2<64*self.depVar):
-                f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]-1)**2)/4/self.depVar)/(4*pi*self.depVar)
-            if ((p[1]-1)**2>64*self.depVar):
-                f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]+1)**2)/4/self.depVar)/(4*pi*self.depVar)
+                f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]-self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
+                C = 1
+                
+            if ((p[1]-self.L)**2<64*self.depVar):
+                f = f + str*exp(-((self.xm-p[0])**2+(self.ym-p[1]+self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
+                D = 1
+                
+            if (A == 1 and C == 1): #Plankton in Lower Left Corner
+                f = f + str*exp(-((self.xm-p[0]-self.L)**2+(self.ym-p[1]-self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
+            if (A == 1 and D == 1): #Plankton in Lower Left Corner
+                f = f + str*exp(-((self.xm-p[0]-self.L)**2+(self.ym-p[1]+self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
+            if (B == 1 and C == 1): #Plankton in Upper Right Corner
+                f = f + str*exp(-((self.xm-p[0]+self.L)**2+(self.ym-p[1]-self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
+            if (B == 1 and D == 1): #Plankton in Lower Right Corner
+                f = f + str*exp(-((self.xm-p[0]+self.L)**2+(self.ym-p[1]+self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
+                
         f = f.reshape((self.N*self.N,))
-        self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*f)
+        self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*(4/self.density)*f)
         return(self.scalar)
     
     def scalarInterp(self,pos):
@@ -202,11 +224,12 @@ class Plankton(Background_Field):
         
         return(bspline.ev(pos[:,1],pos[:,0]))
 
-    # Assumes a [0,1]x[0,1] domain.
+    # Assumes a [0,L]x[0,L] domain.
     def scalarGrad(self,xp,dx=1.0e-4):
+        dx = dx*self.L
         bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
-        p       = array([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
-                                      mod(xp - array([0,dx]),1)])
+        p       = array([mod(xp + array([dx,0]),self.L),mod(xp - array([dx,0]),self.L),mod(xp + array([0,dx]),self.L),
+                                      mod(xp - array([0,dx]),self.L)])
 
         # Flipping x and y inputs because self.Meshed() has reversed row
         # major formatting which goes back to meshgrid which goes back to
@@ -224,13 +247,12 @@ class Plankton(Background_Field):
     def ORIGscalarInterp(self,p):
         return(griddata((self.xm.reshape(self.N**2,),self.ym.reshape(self.N**2,)),self.scalar,p,method='cubic'))
 
-    # Assumes a [0,1]x[0,1] domain.
+    # Assumes a [0,L]x[0,L] domain.
     def ORIGscalarGrad(self,xp,dx=1.0e-4):
-        dp = array(self.scalarInterp([mod(xp + array([dx,0]),1),mod(xp - array([dx,0]),1),mod(xp + array([0,dx]),1),
-                                      mod(xp - array([0,dx]),1)]))
+        dx = self.L*dx
+        dp = array(self.scalarInterp([mod(xp + array([dx,0]),self.L),mod(xp - array([dx,0]),self.L),mod(xp + array([0,dx]),self.L),
+                                      mod(xp - array([0,dx]),self.L)]))
         diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
         diffs = diffs.T
         return(diffs)
-
-
 
