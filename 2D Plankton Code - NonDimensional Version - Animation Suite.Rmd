@@ -252,9 +252,5 @@ plt.show()
 ```
 
 ```{python}
-sqrt(576)
-```
-
-```{python}
 
 ```
