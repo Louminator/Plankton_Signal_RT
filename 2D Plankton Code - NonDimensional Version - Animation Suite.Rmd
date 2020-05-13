@@ -32,7 +32,7 @@ Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lam
 
 ```{python}
 meshsize = 100
-numb = 600
+numb = 24**2 #must be a perfect square.
 LL = 10
 Swimmers = PS.Plankton(DP.atanDep2,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
              lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, dens=6.476363593662468, num = numb)
@@ -249,6 +249,10 @@ anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,len(scalar_
 # Uncomment if you want to save it to a file.  Requires mencoder or ffmpeg or some writer utility to generate the file.
 #anim.save('High_Wave_NumberAnim_d102_d250_Slow.mp4', writer='ffmpeg')
 plt.show()
+```
+
+```{python}
+sqrt(576)
 ```
 
 ```{python}
