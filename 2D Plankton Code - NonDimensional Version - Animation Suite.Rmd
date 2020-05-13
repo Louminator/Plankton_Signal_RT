@@ -18,7 +18,7 @@ import numpy as np
 from numpy.random import rand, uniform
 import matplotlib.pyplot as plt
 import matplotlib.animation
-import PlanktonSignaling.basicsFixDensity as PS
+import PlanktonSignaling.basics as PS
 import PlanktonSignaling.BlobDetection as BD
 import PlanktonSignaling.Deposition as DP
 import profile
@@ -31,8 +31,8 @@ import profile
 Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
 
 ```{python}
-meshsize = 400
-numb = 160000
+meshsize = 100
+numb = 600
 LL = 10
 Swimmers = PS.Plankton(DP.atanDep2,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
              lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, dens=6.476363593662468, num = numb)
@@ -47,14 +47,14 @@ print(Swimmers.d2)
 ```{python}
 def Contour(pos):
     f = zeros((meshsize,meshsize))
-    Std = Swimmers.L**2*Swimmers.density/Swimmers.num
+    Std = Swimmers.L**2/Swimmers.num
     for i in range(0,Swimmers.num):
         A = 0
         B = 0
         C = 0 
         D = 0
         p = pos[i,:]
-        f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1])**2)/4/Std)/(4*pi*Std)
+        f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1])**2)/4/Std)
         if ((p[0])**2<Std):
             f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1])**2)/4/Std)/(4*pi*Std)
             A = 1
@@ -75,7 +75,7 @@ def Contour(pos):
             f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)/(4*pi*Std)
         if (B == 1 and D == 1): #Plankton in Lower Right Corner
             f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)/(4*pi*Std)
-    return(f)
+    return(f*Swimmers.density*Swimmers.L**2/Swimmers.num)
 ```
 
 ```{python}
@@ -104,7 +104,7 @@ plt.show()
 ```
 
 ```{python}
-time = 60
+time = 10
 
 pos_store = list([pos[:,:]])
 pos_store = list([np.array(pos)])
@@ -127,9 +127,9 @@ np.save('ChemStore',scalar_store)
 ```
 
 ```{python}
-ContoursAll = np.zeros((len(pos_store2),meshsize,meshsize))
-for k in range(0,len(scalar_store2)):
-    ContoursAll[k,:,:] = Contour(pos_store2[k])
+ContoursAll = np.zeros((len(pos_store),meshsize,meshsize))
+for k in range(0,len(scalar_store)):
+    ContoursAll[k,:,:] = Contour(pos_store[k])
 #np.save('Contours', ContoursAll)
 ```
 
@@ -175,19 +175,19 @@ plt.show()
 
 ```{python}
 fig  = plt.figure()
-SA = (4*pi*Swimmers.L**2*Swimmers.density/Swimmers.num)**2/160000
-pos_store2 = np.load('PlankDots.npy')
-scalar_store2 = np.load('ChemStore.npy')
-field1 = plt.pcolormesh(Swimmers.xm,Swimmers.ym,ContoursAll[0,:,:]*SA)
+#SA = (4*pi*Swimmers.L**2*Swimmers.density/Swimmers.num)**2/160000
+#pos_store2 = np.load('PlankDots.npy')
+#scalar_store2 = np.load('ChemStore.npy')
+field1 = plt.pcolormesh(Swimmers.xm,Swimmers.ym,ContoursAll[0,:,:])
 fig.colorbar(field1)
-field1.set_clim(0.00042,0.00058)
+#field1.set_clim(0.00042,0.00058)
 
 def initit():
     
     return field1
 
 def animate(k):
-    arr2 = ContoursAll[k,:,:]*SA
+    arr2 = ContoursAll[k,:,:]
     arr2 = arr2[:-1,:-1]
     field1.set_array(arr2.ravel())
     plt.suptitle(r'$d_1 = {0},d_2={1}$, Time = ${2}$'.format(Swimmers.d1, Swimmers.d2,round(k*Swimmers.k,2)), fontsize = 20)
@@ -249,4 +249,8 @@ anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,len(scalar_
 # Uncomment if you want to save it to a file.  Requires mencoder or ffmpeg or some writer utility to generate the file.
 #anim.save('High_Wave_NumberAnim_d102_d250_Slow.mp4', writer='ffmpeg')
 plt.show()
+```
+
+```{python}
+
 ```
