@@ -139,7 +139,7 @@ class Background_Field(object):
 
 class Plankton(Background_Field):
     
-    def __init__(self,depFcn,lambda0=1e0,speed=0.1,depMaxStr=1.0e-10,epsilon=1.0e-8,depTransWidth=0.001,depThreshold=0.008,dens=4,*args,**kwargs):
+    def __init__(self,depFcn,lambda0=1e0,speed=0.1,depMaxStr=1.0e-10,epsilon=1.0e-8,depTransWidth=0.001,depThreshold=0.008,dens=4,num = 400,*args,**kwargs):
 
         self.lambda0 = lambda0
         self.speed = speed
@@ -147,6 +147,7 @@ class Plankton(Background_Field):
         self.depFcn = depFcn
         self.depTransWidth = depTransWidth
         self.depThreshold = depThreshold
+        self.num = num
         self.density = dens
         self.args = args
         self.kwargs = kwargs
@@ -167,6 +168,7 @@ class Plankton(Background_Field):
             pos[j] = mod(pos[j],self.L)
             
     def Update(self,vectors,pos,vel):
+        PlankDensity = self.density*self.L**2/self.num
         c      = self.scalarInterp(pos)
         grad_c = self.scalarGrad(pos)
         self.RT(pos,vel,c,grad_c)
@@ -210,7 +212,7 @@ class Plankton(Background_Field):
                 f = f + str*exp(-((self.xm-p[0]+self.L)**2+(self.ym-p[1]+self.L)**2)/4/self.depVar)/(4*pi*self.depVar)
                 
         f = f.reshape((self.N*self.N,))
-        self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*(4/self.density)*f)
+        self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*(PlankDensity)*f)
         return(self.scalar)
     
     def scalarInterp(self,pos):
