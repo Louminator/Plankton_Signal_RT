@@ -55,26 +55,26 @@ def Contour(pos):
         D = 0
         p = pos[i,:]
         f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1])**2)/4/Std)
-        if ((p[0])**2<Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1])**2)/4/Std)/(4*pi*Std)
+        if ((p[0])**2<8*Std):
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1])**2)/4/Std)
             A = 1
-        if ((p[0]-Swimmers.L)**2<Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1])**2)/4/Std)/(4*pi*Std)
+        if ((p[0]-Swimmers.L)**2<8*Std):
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1])**2)/4/Std)
             B = 1
-        if ((p[1])**2<Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)/(4*pi*Std)
+        if ((p[1])**2<8*Std):
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)
             C = 1
-        if ((p[1]-Swimmers.L)**2<Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)/(4*pi*Std)
+        if ((p[1]-Swimmers.L)**2<8*Std):
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)
             D = 1
         if (A == 1 and C == 1): #Plankton in Lower Left Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)/(4*pi*Std)
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)
         if (A == 1 and D == 1): #Plankton in Lower Left Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)/(4*pi*Std)
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)
         if (B == 1 and C == 1): #Plankton in Upper Right Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)/(4*pi*Std)
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)
         if (B == 1 and D == 1): #Plankton in Lower Right Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)/(4*pi*Std)
+            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)
     return(f*Swimmers.density*Swimmers.L**2/Swimmers.num)
 ```
 
@@ -91,8 +91,8 @@ vel = [array([cos(th),sin(th)])]
 
 for l in range(0,lenn):
     for k in range(0,lenn):
-        pos = np.append(pos,[array([mod(k*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + (Swimmers.L*1/lenn),Swimmers.L),
-                                  mod(l*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + (Swimmers.L*1/lenn),Swimmers.L)])],axis=0)
+        pos = np.append(pos,[array([mod(k*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + 0.5*(Swimmers.L*1/lenn),Swimmers.L),
+                                  mod(l*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + 0.5*(Swimmers.L*1/lenn),Swimmers.L)])],axis=0)
         th  = rand()*2*pi
         vel = np.append(vel,[array([cos(th),sin(th)])],axis=0)
 
