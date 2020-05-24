@@ -252,5 +252,13 @@ plt.show()
 ```
 
 ```{python}
+shape(reshape(Swimmers.scalar,(100,100)))
+```
+
+```{python}
+8*sqrt(Swimmers.L**2/Swimmers.num)
+```
+
+```{python}
 
 ```
