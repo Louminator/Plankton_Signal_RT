@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.2'
       jupytext_version: 1.4.2
   kernelspec:
-    display_name: Python 3
+    display_name: Python [Root]
     language: python
-    name: python3
+    name: Python [Root]
 ---
 
 ```{python}
@@ -31,17 +31,19 @@ import profile
 Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
 
 ```{python}
-meshsize = 80
-num = 1600
-LL = 2
-Swimmers = PS.Plankton(DP.linAtanDep2,N = meshsize,depMaxStr=8.0e-4,Const=3,L=LL,k=0.02,epsilon=1e-5,speed=0.3,
-                    lambda0=.87,kappa=1e-3,beta=.9,depTransWidth=0.0001,depThreshold=0.003,dens=num/(LL**2))
+meshsize = 100
+numb = 24**2 #must be a perfect square.
+LL = 10
+
+Swimmers = PS.Plankton(DP.atanDep2,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
+             lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=0.012)
 
 def initial_conditions(x,y):
-    return(0*x+0.003)
+    return(0*x+Swimmers.c0)
 
 print(Swimmers.d1)
 print(Swimmers.d2)
+Swimmers.CheckStability()
 ```
 
 ```{python}

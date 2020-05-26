@@ -1,5 +1,4 @@
 # coding: utf-8
-
 from scipy import *
 from math import acos, asin
 import scipy.sparse as sp
@@ -7,6 +6,7 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline,griddata
 from scipy.sparse.linalg import spsolve
 from numpy.random import rand, uniform
+from scipy import sparse
 
 class Background_Field(object):
     "A class that creates the background concentration field and evolves"
@@ -139,7 +139,7 @@ class Background_Field(object):
 
 class Plankton(Background_Field):
     
-    def __init__(self,depFcn,lambda0=1e0,speed=0.1,depMaxStr=1.0e-10,epsilon=1.0e-8,depTransWidth=0.001,depThreshold=0.008,dens=4,num = 400,*args,**kwargs):
+    def __init__(self,depFcn,lambda0=1e0,speed=0.1,depMaxStr=1.0e-10,epsilon=1.0e-8,depTransWidth=0.001,depThreshold=0.008,num = 400,c0=0.012,*args,**kwargs):
 
         self.lambda0 = lambda0
         self.speed = speed
@@ -148,13 +148,14 @@ class Plankton(Background_Field):
         self.depTransWidth = depTransWidth
         self.depThreshold = depThreshold
         self.num = num
-        self.density = dens
+        self.c0 = c0 #Initial Chemical Steady State
         self.args = args
         self.kwargs = kwargs
         
         self.epsilon = epsilon
 
         super(Plankton,self).__init__(*args,**kwargs)
+        self.density = self.d2*self.c0/self.depFcn(self.c0,self.depMaxStr,self.depThreshold,self.depTransWidth)
             
     def RT(self,pos,vel,c,grad_c):
         # Actually, I need to do this as tumble and run, TR.
@@ -257,4 +258,48 @@ class Plankton(Background_Field):
         diffs = array([dp[0]-dp[1],dp[2]-dp[3]])/2/dx
         diffs = diffs.T
         return(diffs)
+        
+    def MatrixBuildStable(self,k1,k2,s,d3):
+        #Builds the fourier transform matrix that is used in the stability calculations
+        kappa = k1 + 1j*k2
+        kappab = k1 - 1j*k2
+        psib = self.density/(2*pi)
+        Z = zeros((2*s+1,1),dtype=complex)
+        SupD = ones(2*s,dtype=complex)*(1j/2)*(kappa)
+        SubD = ones(2*s,dtype=complex)*(1j/2)*(kappab)
+        MD = zeros(2*s+1,dtype=complex) + -1/2
+        MD[s]=0
+        N = sparse.diags([MD,SupD,SubD],[0,1,-1])
+        Z[s-1]=-psib*kappa*1j/(4*self.epsilon)
+        Z[s+1]=-psib*kappab*1j/(4*self.epsilon)
+        F = sparse.hstack([sparse.bsr_matrix(Z),N])
+        M = zeros((1,2*s+2),dtype=complex)
+        M[0,0] = d3 - self.d1*(k1**2 + k2**2)
+        M[0,s+1] = 2*pi*self.depFcn(self.c0,self.depMaxStr,self.depThreshold,self.depTransWidth)
+        return(sparse.vstack([sparse.bsr_matrix(M),F]))
+    
+    def CheckStability(self):
+        #Calculuates the most unstable wave number in the system
+        f0 = self.depFcn(self.c0,self.depMaxStr,self.depThreshold,self.depTransWidth)
+        f1 = self.depFcn(self.c0+0.00001,self.depMaxStr,self.depThreshold,self.depTransWidth)
+        f2 = self.depFcn(self.c0-0.00001,self.depMaxStr,self.depThreshold,self.depTransWidth)
+        d1 = self.d1
+        d2 = self.d2        
+        fp = (f1 - f2)/(2*0.0001)
+        d3 = self.density*fp - d2
+        eigs = []
+        modes = 100
+        k11 = linspace(0,self.L/2,100)
+        for j in k11:
+            try:
+                eigs=np.append(eigs,sparse.linalg.eigs(self.MatrixBuildStable(j,j,modes,d3),which='LR',k=1)[0][0])
+            except:
+                eigs = np.append(eigs,max(real(sparse.linalg.eigs(self.MatrixBuildStable(j,j,modes,d3))[0])))
+        normMax = round(sqrt(2)*k11[argmax(eigs)])
+        if (normMax > self.L/(2*pi)):
+            print('These parameter values will make the system unstable.')
+        else:
+            print('These parameter values will make the system stable.')
+        print('Norm of most unstable wave number: {0}'.format(normMax))
+                     
 

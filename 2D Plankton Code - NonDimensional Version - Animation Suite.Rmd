@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.2'
       jupytext_version: 1.4.2
   kernelspec:
-    display_name: Python 3
+    display_name: Python [Root]
     language: python
-    name: python3
+    name: Python [Root]
 ---
 
 ```{python}
@@ -34,14 +34,16 @@ Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lam
 meshsize = 100
 numb = 24**2 #must be a perfect square.
 LL = 10
+
 Swimmers = PS.Plankton(DP.atanDep2,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
-             lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, dens=6.476363593662468, num = numb)
+             lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=0.012)
 
 def initial_conditions(x,y):
-    return(0*x+0.012)
+    return(0*x+Swimmers.c0)
 
 print(Swimmers.d1)
 print(Swimmers.d2)
+Swimmers.CheckStability()
 ```
 
 ```{python}
@@ -249,16 +251,4 @@ anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,len(scalar_
 # Uncomment if you want to save it to a file.  Requires mencoder or ffmpeg or some writer utility to generate the file.
 #anim.save('High_Wave_NumberAnim_d102_d250_Slow.mp4', writer='ffmpeg')
 plt.show()
-```
-
-```{python}
-shape(reshape(Swimmers.scalar,(100,100)))
-```
-
-```{python}
-8*sqrt(Swimmers.L**2/Swimmers.num)
-```
-
-```{python}
-
 ```
