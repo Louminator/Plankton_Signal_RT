@@ -12,6 +12,8 @@ jupyter:
     name: python3
 ---
 
+We need to execute the *ipython* magic twice.  We do not know why.  Once is not enough.  If you add a comment before the *ipython* magic, even twice is not enough.
+
 ```{python}
 from scipy import *
 import numpy as np
@@ -25,8 +27,8 @@ import profile
 import time
 
 # %matplotlib notebook
+# %matplotlib notebook
 
-# #%load_ext Cython
 ```
 
 Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
@@ -46,114 +48,55 @@ print(Swimmers.d2)
 ```
 
 ```{python}
-def Contour(pos):
-    f = zeros((meshsize,meshsize))
-    Std = Swimmers.L**2/Swimmers.num
-    for i in range(0,Swimmers.num):
-        A = 0
-        B = 0
-        C = 0 
-        D = 0
-        p = pos[i,:]
-        f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1])**2)/4/Std)
-        if ((p[0])**2<8*Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1])**2)/4/Std)
-            A = 1
-        if ((p[0]-Swimmers.L)**2<8*Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1])**2)/4/Std)
-            B = 1
-        if ((p[1])**2<8*Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)
-            C = 1
-        if ((p[1]-Swimmers.L)**2<8*Std):
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0])**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)
-            D = 1
-        if (A == 1 and C == 1): #Plankton in Lower Left Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)
-        if (A == 1 and D == 1): #Plankton in Lower Left Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]-Swimmers.L)**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)
-        if (B == 1 and C == 1): #Plankton in Upper Right Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]-Swimmers.L)**2)/4/Std)
-        if (B == 1 and D == 1): #Plankton in Lower Right Corner
-            f = f + (1/(4*pi*Std))*exp(-((Swimmers.xm-p[0]+Swimmers.L)**2+(Swimmers.ym-p[1]+Swimmers.L)**2)/4/Std)
-    return(f*Swimmers.density*Swimmers.L**2/Swimmers.num)
-```
+def particleProjection(pos,meshsize):
+    
+    x = r_[0:Swimmers.L:1j*meshsize]# setup the spatial mesh. It is a long row vector
 
-```{python}
-def ContourFaster(pos):
+    # Create some local coordinates for the square domain.
+    y = 1*x
+    xm,ym = np.meshgrid(x,y)
+
     f = zeros((meshsize,meshsize))
-    Std = Swimmers.L**2/Swimmers.num
-    intDelta = int((meshsize-1)*8*sqrt(Std)/Swimmers.L)
+    Std = (Swimmers.L/(meshsize-1))**2
+    
+    cutoff = 32*Std
+
     for i in range(0,Swimmers.num):
-        A = 0
-        B = 0
-        C = 0 
-        D = 0
+        A, B, C, D = 0,0,0,0
+        
         p = pos[i,:]
         
-        centerX = int((meshsize-1)*p[0]/Swimmers.L)
-        centerY = int((meshsize-1)*p[1]/Swimmers.L)
+        f = f + (1/(4*pi*Std))*exp(-((xm-p[0])**2+(ym-p[1])**2)/4/Std)
         
-        lowerX      = max(0,centerX-intDelta)
-        lowerXplus  = max(0,centerX-intDelta + (meshsize-1))
-        lowerXminus = max(0,centerX-intDelta - (meshsize-1))
-        upperX      = min(meshsize,centerX+intDelta)
-        upperXplus  = min(meshsize,centerX+intDelta + (meshsize-1))
-        upperXminus = min(meshsize,centerX+intDelta - (meshsize-1))
-
-        lowerY      = max(0,centerY-intDelta)
-        lowerYplus  = max(0,centerY-intDelta + (meshsize-1))
-        lowerYminus = max(0,centerY-intDelta - (meshsize-1))
-        upperY      = min(meshsize,centerY+intDelta)
-        upperYplus  = min(meshsize,centerY+intDelta + (meshsize-1))
-        upperYminus = min(meshsize,centerY+intDelta - (meshsize-1))
-        
-        sliceX = slice(lowerX,upperX)
-        sliceY = slice(lowerY,upperY)
-        
-        f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0])**2+(Swimmers.ym[sliceY,sliceX]-p[1])**2)/4/Std)
-        if ((p[0])**2<8*Std):
-            sliceX = slice(lowerXplus,upperXplus)
-            sliceY = slice(lowerY,upperY)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0]-Swimmers.L)**2+(Swimmers.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+        if ((p[0])**2<cutoff):
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0]-Swimmers.L)**2+(ym-p[1])**2)/4/Std)
             A = 1
-        if ((p[0]-Swimmers.L)**2<8*Std):
-            sliceX = slice(lowerXminus,upperXminus)
-            sliceY = slice(lowerY,upperY)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0]+Swimmers.L)**2+(Swimmers.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+        if ((p[0]-Swimmers.L)**2<cutoff):
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0]+Swimmers.L)**2+(ym-p[1])**2)/4/Std)
             B = 1
-        if ((p[1])**2<8*Std):
-            sliceX = slice(lowerX,upperX)
-            sliceY = slice(lowerYplus,upperYplus)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0])**2+(Swimmers.ym[sliceY,sliceX]-p[1]-Swimmers.L)**2)/4/Std)
+        if ((p[1])**2<cutoff):
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0])**2+(ym-p[1]-Swimmers.L)**2)/4/Std)
             C = 1
-        if ((p[1]-Swimmers.L)**2<8*Std):
-            sliceX = slice(lowerX,upperX)
-            sliceY = slice(lowerYminus,upperYminus)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0])**2+(Swimmers.ym[sliceY,sliceX]-p[1]+Swimmers.L)**2)/4/Std)
+        if ((p[1]-Swimmers.L)**2<cutoff):
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0])**2+(ym-p[1]+Swimmers.L)**2)/4/Std)
             D = 1
-        if (A == 1 and C == 1): #Plankton in Lower Left Corner
-            sliceX = slice(lowerXplus,upperXplus)
-            sliceY = slice(lowerYplus,upperYplus)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0]-Swimmers.L)**2+(Swimmers.ym[sliceY,sliceX]-p[1]-Swimmers.L)**2)/4/Std)
-        if (A == 1 and D == 1): #Plankton in Lower Left Corner
-            sliceX = slice(lowerXplus,upperXplus)
-            sliceY = slice(lowerYminus,upperYminus)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0]-Swimmers.L)**2+(Swimmers.ym[sliceY,sliceX]-p[1]+Swimmers.L)**2)/4/Std)
-        if (B == 1 and C == 1): #Plankton in Upper Right Corner
-            sliceX = slice(lowerXminus,upperXminus)
-            sliceY = slice(lowerYplus,upperYplus)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0]+Swimmers.L)**2+(Swimmers.ym[sliceY,sliceX]-p[1]-Swimmers.L)**2)/4/Std)
-        if (B == 1 and D == 1): #Plankton in Lower Right Corner
-            sliceX = slice(lowerXminus,upperXminus)
-            sliceY = slice(lowerYminus,upperYminus)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + (1/(4*pi*Std))*exp(-((Swimmers.xm[sliceY,sliceX]-p[0]+Swimmers.L)**2+(Swimmers.ym[sliceY,sliceX]-p[1]+Swimmers.L)**2)/4/Std)
-    return(f*Swimmers.density*Swimmers.L**2/Swimmers.num)
+            
+        if ((A == 1) and (C == 1)): #Plankton in Lower Left Corner
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0]-Swimmers.L)**2+(ym-p[1]-Swimmers.L)**2)/4/Std)
+        if ((A == 1) and (D == 1)): #Plankton in Upper Left Corner
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0]-Swimmers.L)**2+(ym-p[1]+Swimmers.L)**2)/4/Std)
+        if ((B == 1) and (C == 1)): #Plankton in Lower Right Corner
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0]+Swimmers.L)**2+(ym-p[1]-Swimmers.L)**2)/4/Std)
+        if ((B == 1) and (D == 1)): #Plankton in Upper Right Corner
+            f = f + (1/(4*pi*Std))*exp(-((xm-p[0]+Swimmers.L)**2+(ym-p[1]+Swimmers.L)**2)/4/Std)
+            
+    return xm,ym,f*(Swimmers.density*Swimmers.L**2/Swimmers.num)
 ```
 
 ```{python}
 Swimmers.SetIC(initial_conditions)
 
+#Please fix this.  This should not be here.
 pos = [array([0.1,0.1])]
 
 aggreg = [array([0,0])]
@@ -169,6 +112,9 @@ for l in range(0,lenn):
         th  = rand()*2*pi
         vel = np.append(vel,[array([cos(th),sin(th)])],axis=0)
 
+#Please fix this.  See above.
+pos = pos[1:]
+        
 plt.figure()
 plt.pcolormesh(Swimmers.xm,Swimmers.ym,Swimmers.Meshed())
 plt.plot(pos[:,0],pos[:,1],'r.',MarkerSize=.5)
@@ -201,12 +147,14 @@ np.save('ChemStore',scalar_store)
 
 ```{python}
 start = time.process_time()
-ContoursAll = np.zeros((len(pos_store),meshsize,meshsize))
+ContoursAll = np.zeros((len(pos_store),particleMeshsize,particleMeshsize))
 for k in range(0,len(scalar_store)):
-    ContoursAll[k,:,:] = Contour(pos_store[k])
-print("Time:", time.process_time()-start)
+    xm, ym, ContoursAll[k,:,:] = particleProjection(pos_store[k],particleMeshsize)
 #np.save('Contours', ContoursAll)
+print('Time: ',time.process_time()-start)
 ```
+
+### Snapshot of initial plankton density
 
 ```{python}
 start = time.process_time()
@@ -263,7 +211,7 @@ fig  = plt.figure()
 #SA = (4*pi*Swimmers.L**2*Swimmers.density/Swimmers.num)**2/160000
 #pos_store2 = np.load('PlankDots.npy')
 #scalar_store2 = np.load('ChemStore.npy')
-field1 = plt.pcolormesh(Swimmers.xm,Swimmers.ym,ContoursAll[0,:,:])
+field1 = plt.pcolormesh(xm,ym,ContoursAll[0,:,:])
 fig.colorbar(field1)
 #field1.set_clim(0.00042,0.00058)
 
