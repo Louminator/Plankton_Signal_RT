@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.2'
       jupytext_version: 1.4.2
   kernelspec:
-    display_name: Python 3
+    display_name: Python [Root]
     language: python
-    name: python3
+    name: Python [Root]
 ---
 
 We need to execute the *ipython* magic twice.  We do not know why.  Once is not enough.  If you add a comment before the *ipython* magic, even twice is not enough.
@@ -35,8 +35,8 @@ Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lam
 
 ```{python}
 particleMeshsize = 40
-meshsize = 100
-numb = 24**2 #must be a perfect square.
+meshsize = 200
+numb = 100**2 #must be a perfect square.
 LL = 10
 Swimmers = PS.Plankton(DP.atanDep2,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
              lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, dens=6.476363593662468, num = numb)
@@ -180,8 +180,8 @@ def particleProjectionFaster(pos,meshsize):
 ```{python}
 Swimmers.SetIC(initial_conditions)
 
-#Please fix this.  This should not be here.
-pos = [array([0.1,0.1])]
+#Fixed the initialization
+pos = np.empty((1,2))
 
 aggreg = [array([0,0])]
 areaAve = [array([0,0])]
@@ -195,9 +195,6 @@ for l in range(0,lenn):
                                   mod(l*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + 0.5*(Swimmers.L*1/lenn),Swimmers.L)])],axis=0)
         th  = rand()*2*pi
         vel = np.append(vel,[array([cos(th),sin(th)])],axis=0)
-
-#Please fix this.  See above.
-pos = pos[1:]
         
 plt.figure()
 plt.pcolormesh(Swimmers.xm,Swimmers.ym,Swimmers.Meshed())
@@ -206,8 +203,28 @@ plt.colorbar()
 plt.show()
 ```
 
+### Comparison between Slicing and Regular Update Methods
+
 ```{python}
-simTime = 10
+#First, we use the regular method
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization here
+pos = np.empty((1,2))
+
+lenn= int(sqrt(numb))
+th = rand()*2*pi
+vel = [array([cos(th),sin(th)])]
+
+for l in range(0,lenn):
+    for k in range(0,lenn):
+        pos = np.append(pos,[array([mod(k*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + 0.5*(Swimmers.L*1/lenn),Swimmers.L),
+                                  mod(l*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + 0.5*(Swimmers.L*1/lenn),Swimmers.L)])],axis=0)
+        th  = rand()*2*pi
+        vel = np.append(vel,[array([cos(th),sin(th)])],axis=0)
+
+start = time.process_time()
+simTime = 5
 
 pos_store = list([pos[:,:]])
 pos_store = list([np.array(pos)])
@@ -221,12 +238,41 @@ for plot in range(0,1):
         Swimmers.Update(Swimmers.scalar,pos,vel)
         pos_store.append(np.array(pos))
         scalar_store.append(Swimmers.Meshed())
-        
-        #Counts the Number of Aggregations at time k
-        
-        #aggreg = np.vstack((aggreg,[k+1,BD.countingAll(1,255,BD.Contour(Swimmers,pos,400,meshsize))])) 
-np.save('PlanktonPos',pos_store)
-np.save('ChemStore',scalar_store)
+print('Regular Update Time: ',time.process_time()-start)
+
+#Trying with UpdateSlice to see difference 
+
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization
+pos = np.empty((1,2))
+
+lenn= int(sqrt(numb))
+th = rand()*2*pi
+vel = [array([cos(th),sin(th)])]
+
+for l in range(0,lenn):
+    for k in range(0,lenn):
+        pos = np.append(pos,[array([mod(k*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + 0.5*(Swimmers.L*1/lenn),Swimmers.L),
+                                  mod(l*(Swimmers.L*1/lenn) + 0.01*(rand()-0.5) + 0.5*(Swimmers.L*1/lenn),Swimmers.L)])],axis=0)
+        th  = rand()*2*pi
+        vel = np.append(vel,[array([cos(th),sin(th)])],axis=0)
+
+start = time.process_time()
+
+pos_store2 = list([pos[:,:]])
+pos_store2 = list([np.array(pos)])
+
+scalar_store2 = list([Swimmers.Meshed()])
+aggreg = np.array([0,0])
+
+count = 1
+for plot in range(0,1):
+    for k in range(0,simTime):
+        Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+        pos_store2.append(np.array(pos))
+        scalar_store2.append(Swimmers.Meshed())
+print('Slicing Update Time: ',time.process_time()-start)
 ```
 
 ```{python}
@@ -260,6 +306,20 @@ plt.colorbar()
 plt.show()
 ```
 
+### Difference between total chemical over time
+
+```{python}
+plt.figure()
+Chem1 = []
+Chem2 = []
+for k in range(0,simTime):
+    Chem1 = np.append(Chem1,sum(scalar_store[k]))
+    Chem2 = np.append(Chem2,sum(scalar_store2[k]))
+plt.plot(linspace(0,simTime,simTime),Chem1, 'r-')
+plt.plot(linspace(0,simTime,simTime),Chem2, 'b-')
+plt.ylim(479.8,480.2)
+```
+
 # Animations
 
 
@@ -268,10 +328,10 @@ plt.show()
 ```{python}
 fig   = plt.figure()
 ax    = plt.subplot(1,1,1)
-pos_store2 = np.load('PlankDots.npy')
-scalar_store2 = np.load('ChemStore.npy')
+#pos_store2 = np.load('PlankDots.npy')
+#scalar_store2 = np.load('ChemStore.npy')
 field = ax.pcolormesh(Swimmers.xm,Swimmers.ym,scalar_store2[0])
-field.set_clim(0.01199,0.01201)
+field.set_clim(0,0.03)
 dots, = ax.plot([], [], 'r.',MarkerSize=.55)
 fig.colorbar(field)
 
@@ -290,8 +350,8 @@ def animate(k):
 
     return dots,field
     
-anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,2,1),
-                                          interval=400,blit=False,repeat=False)
+anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,20,1),
+                                          interval=50,blit=False,repeat=False)
 
 # Uncomment if you want to save it to a file.  Requires mencoder or ffmpeg or some writer utility to generate the file.
 #anim.save('d102_d5_delta1e3_Atandep_HighDensity_scalingsmall3.mp4', writer='ffmpeg')
@@ -376,8 +436,4 @@ anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,len(scalar_
 # Uncomment if you want to save it to a file.  Requires mencoder or ffmpeg or some writer utility to generate the file.
 #anim.save('High_Wave_NumberAnim_d102_d250_Slow.mp4', writer='ffmpeg')
 plt.show()
-```
-
-```{python}
-
 ```
