@@ -220,7 +220,7 @@ class Plankton(Background_Field):
         grad_c = self.scalarGrad(pos)
         self.RT(pos,vel,c,grad_c)
         
-        Std = (self.L/(self.N-1))**2
+        Std = self.depVar
         boundaryCutoff = 32*Std
         intDelta = int((self.N-1)*8*sqrt(Std)/self.L)
         f = zeros((self.N,self.N))
