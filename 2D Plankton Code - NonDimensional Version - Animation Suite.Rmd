@@ -28,15 +28,14 @@ import time
 
 # %matplotlib notebook
 # %matplotlib notebook
-
 ```
 
 Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
 
 ```{python}
 particleMeshsize = 40
-meshsize = 200
-numb = 100**2 #must be a perfect square.
+meshsize = 120
+numb = 120**2 #must be a perfect square.
 LL = 10
 Swimmers = PS.Plankton(DP.atanDep2,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
              lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, dens=6.476363593662468, num = numb)
@@ -203,7 +202,26 @@ plt.colorbar()
 plt.show()
 ```
 
-### Comparison between Slicing and Regular Update Methods
+```{python}
+Swimmers.SetIC(initial_conditions)
+
+simTime = 100
+
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
+
+
+scalar_store = list([Swimmers.Meshed()])
+
+count = 1
+for plot in range(0,1):
+    for k in range(0,simTime):
+        Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+        pos_store.append(np.array(pos))
+        scalar_store.append(Swimmers.Meshed())
+```
+
+### Comparison between Slicing and Regular Update Methods: Time
 
 ```{python}
 #First, we use the regular method
@@ -223,16 +241,19 @@ for l in range(0,lenn):
         th  = rand()*2*pi
         vel = np.append(vel,[array([cos(th),sin(th)])],axis=0)
 
-start = time.process_time()
-simTime = 5
+simTime = 100
 
+pos2 = pos
 pos_store = list([pos[:,:]])
 pos_store = list([np.array(pos)])
 
-scalar_store = list([Swimmers.Meshed()])
-aggreg = np.array([0,0])
+pos_storeinit = list([pos[:,:]])
+pos_storeinit = list([np.array(pos)])
+velinit = vel
 
-count = 1
+scalar_store = list([Swimmers.Meshed()])
+start = time.process_time()
+
 for plot in range(0,1):
     for k in range(0,simTime):
         Swimmers.Update(Swimmers.scalar,pos,vel)
@@ -245,6 +266,30 @@ print('Regular Update Time: ',time.process_time()-start)
 Swimmers.SetIC(initial_conditions)
 
 #Fixed the initialization
+start = time.process_time()
+
+pos_store2 = list([pos2[:,:]])
+pos_store2 = list([np.array(pos2)])
+vel2 = velinit
+
+scalar_store2 = list([Swimmers.Meshed()])
+
+start = time.process_time()
+for plot in range(0,1):
+    for k in range(0,simTime):
+        Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+        pos_store2.append(np.array(pos))
+        scalar_store2.append(Swimmers.Meshed())
+print('Slicing Update Time: ',time.process_time()-start)
+```
+
+### Comparison between Regular and Slicing Update Methods: Error
+
+```{python}
+#First, we use the regular method
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization here
 pos = np.empty((1,2))
 
 lenn= int(sqrt(numb))
@@ -258,22 +303,39 @@ for l in range(0,lenn):
         th  = rand()*2*pi
         vel = np.append(vel,[array([cos(th),sin(th)])],axis=0)
 
-start = time.process_time()
+pos2 = pos
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
 
-pos_store2 = list([pos[:,:]])
-pos_store2 = list([np.array(pos)])
+pos_storeinit = list([pos[:,:]])
+pos_storeinit = list([np.array(pos)])
+velinit = vel
 
+scalar_store = list([Swimmers.Meshed()])
+
+Swimmers.Update(Swimmers.scalar,pos,vel)
+pos_store.append(np.array(pos))
+scalar_store.append(Swimmers.Meshed())
+
+#Trying with UpdateSlice to see difference 
+
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization
+
+pos_store2 = list([pos2[:,:]])
+pos_store2 = list([np.array(pos2)])
+vel2 = velinit
 scalar_store2 = list([Swimmers.Meshed()])
-aggreg = np.array([0,0])
 
-count = 1
-for plot in range(0,1):
-    for k in range(0,simTime):
-        Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
-        pos_store2.append(np.array(pos))
-        scalar_store2.append(Swimmers.Meshed())
-print('Slicing Update Time: ',time.process_time()-start)
+Swimmers.UpdateSlice(Swimmers.scalar,pos2,vel2)
+pos_store2.append(np.array(pos2))
+scalar_store2.append(Swimmers.Meshed())
+
+print('Relative Error: {0}'.format((sum(scalar_store2[1]) - sum(scalar_store[1]))/(sum(scalar_store[1]))))
 ```
+
+### Comparison of methods with contour smoothing
 
 ```{python}
 start = time.process_time()
@@ -317,7 +379,6 @@ for k in range(0,simTime):
     Chem2 = np.append(Chem2,sum(scalar_store2[k]))
 plt.plot(linspace(0,simTime,simTime),Chem1, 'r-')
 plt.plot(linspace(0,simTime,simTime),Chem2, 'b-')
-plt.ylim(479.8,480.2)
 ```
 
 # Animations
@@ -328,8 +389,6 @@ plt.ylim(479.8,480.2)
 ```{python}
 fig   = plt.figure()
 ax    = plt.subplot(1,1,1)
-#pos_store2 = np.load('PlankDots.npy')
-#scalar_store2 = np.load('ChemStore.npy')
 field = ax.pcolormesh(Swimmers.xm,Swimmers.ym,scalar_store2[0])
 field.set_clim(0,0.03)
 dots, = ax.plot([], [], 'r.',MarkerSize=.55)
@@ -342,7 +401,7 @@ def initit():
     return field,dots
 
 def animate(k):
-    arr = scalar_store2[k]
+    arr = scalar_store[k]
     arr = arr[:-1, :-1]
     field.set_array(arr.ravel())
     plt.title(r'Time = ${0}$'.format(k*Swimmers.k), fontsize = 20)
@@ -350,7 +409,7 @@ def animate(k):
 
     return dots,field
     
-anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,20,1),
+anim = matplotlib.animation.FuncAnimation(fig,animate,frames=range(0,simTime,2),
                                           interval=50,blit=False,repeat=False)
 
 # Uncomment if you want to save it to a file.  Requires mencoder or ffmpeg or some writer utility to generate the file.
@@ -362,12 +421,8 @@ plt.show()
 
 ```{python}
 fig  = plt.figure()
-#SA = (4*pi*Swimmers.L**2*Swimmers.density/Swimmers.num)**2/160000
-#pos_store2 = np.load('PlankDots.npy')
-#scalar_store2 = np.load('ChemStore.npy')
 field1 = plt.pcolormesh(xm,ym,ContoursAll[0,:,:])
 fig.colorbar(field1)
-#field1.set_clim(0.00042,0.00058)
 
 def initit():
     
