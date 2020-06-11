@@ -221,11 +221,11 @@ class Plankton(Background_Field):
         self.RT(pos,vel,c,grad_c)
         
         Std = self.depVar
-        boundaryCutoff = 32*Std
         intDelta = int((self.N-1)*8*sqrt(Std)/self.L)
-        f = zeros((self.N,self.N))
         meshsize = self.N
         depStr = self.depFcn(c,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
+        f = zeros((self.N,self.N))
+        boundaryCutoff = 64*self.depVar
 
         for p,stren in zip(pos,depStr):
         
