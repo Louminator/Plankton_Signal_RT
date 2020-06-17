@@ -301,5 +301,5 @@ class Plankton(Background_Field):
         else:
             print('These parameter values will make the system stable.')
         print('Norm of most unstable wave number: {0}'.format(normMax))
-                     
+
 
