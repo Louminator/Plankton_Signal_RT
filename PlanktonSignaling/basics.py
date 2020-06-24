@@ -229,7 +229,7 @@ class Plankton(Background_Field):
         meshsize = self.N
         depStr = self.depFcn(c,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
 
-        for p,stren in zip(pos,depStr):
+        for p,str in zip(pos,depStr):
 
             A, B, C, D = 0,0,0,0
 
@@ -251,42 +251,43 @@ class Plankton(Background_Field):
             upperYminus = min(meshsize,centerY+intDelta - (meshsize-1))
             sliceX = slice(lowerX,upperX+1)
             sliceY = slice(lowerY,upperY+1)
-            f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+            f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
             if ((p[0])**2<boundaryCutoff):
                 sliceX = slice(lowerXplus,upperXplus+1)
                 sliceY = slice(lowerY,upperY+1)
-                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
                 A = 1
             if ((p[0]-self.L)**2<boundaryCutoff):
                 sliceX = slice(lowerXminus,upperXminus+1)
                 sliceY = slice(lowerY,upperY+1)
-                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]+self.L)**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]+self.L)**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
                 B = 1
             if ((p[1])**2<boundaryCutoff):
                 sliceX = slice(lowerX,upperX+1)
                 sliceY = slice(lowerYplus,upperYplus+1)
-                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1]-self.L)**2)/4/Std)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1]-self.L)**2)/4/Std)
                 C = 1
             if ((p[1]-self.L)**2<boundaryCutoff):
                 sliceX = slice(lowerX,upperX+1)
                 sliceY = slice(lowerYminus,upperYminus+1)
-                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
                 D = 1
             if (A == 1 and C == 1): #Plankton in Lower Left Corner
                 sliceX = slice(lowerXplus,upperXplus+1)
                 sliceY = slice(lowerYplus,upperYplus+1)
-                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1]-self.L)**2)/4/Std)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1]-self.L)**2)/4/Std)
             if (A == 1 and D == 1): #Plankton in Lower Left Corner
                 sliceX = slice(lowerXplus,upperXplus+1)
                 sliceY = slice(lowerYminus,upperYminus+1)
-                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
             if (B == 1 and C == 1): #Plankton in Upper Right Corner
                 sliceX = slice(lowerXminus,upperXminus+1)
                 sliceY = slice(lowerYplus,upperYplus+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]+self.L)**2+(self.ym[sliceY,sliceX]-p[1]-self.L)**2)/4/Std)
             if (B == 1 and D == 1): #Plankton in Lower Right Corner
                 sliceX = slice(lowerXminus,upperXminus+1)
                 sliceY = slice(lowerYminus,upperYminus+1)
-                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]+self.L)**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + str*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]+self.L)**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
         f = f.reshape((self.N*self.N,))
         self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*(PlankDensity)*f)
         return(self.scalar)
