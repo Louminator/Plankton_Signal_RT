@@ -8,7 +8,7 @@ from scipy import ndimage
 
 def constantDep(c,depMaxStr,depThreshold=0.08,depTransWidth=1/250,**kwargs):
     '''Constant deposition function'''
-    return(array(depMaxStr*ones(len(c))))
+    return(0*c + depMaxStr)
 
 def atanDep(c,depMaxStr,depThreshold=0.08,depTransWidth=1/250,**kwargs):
     '''arctan (soft switch) transition function'''
