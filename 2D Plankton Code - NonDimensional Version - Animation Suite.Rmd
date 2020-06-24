@@ -226,7 +226,7 @@ plt.title(r'Err between Slicing and Regular Update')
 ### Testing Update Methods more Formally
 
 ```{python}
-NUMB = [10,20,30,40]
+NUMB = [5]
 plt.figure()
 for nn in NUMB:
     meshsize = 200
@@ -239,7 +239,7 @@ for nn in NUMB:
     def initial_conditions(x,y):
         return(0*x+Swimmers.c0)
 
-    simTime = 6
+    simTime = 3
     Swimmers.SetIC(initial_conditions)
     lenn = int(np.sqrt(numb))
     pos = np.zeros((1,2))
@@ -310,6 +310,25 @@ plt.title('Changing N affect on Error')
 plt.xlabel('Time')
 plt.ylabel('Error')
 plt.legend()
+```
+
+```{python}
+plt.figure()
+ERR = []
+for j in range(0,simTime+1):
+    ERR = np.append(ERR,(np.sum(ChemStoreSlice[j,:,:])-np.sum(ChemStoreReg[j,:,:]))/np.sum(ChemStoreReg[j,:,:]))
+plt.plot(range(0,simTime+1),ERR,label='N = {0}'.format(nn))
+```
+
+```{python}
+# %matplotlib notebook
+
+plt.figure()
+j = 3
+plt.plot(pos_store2[j][:,0],pos_store2[j][:,1],'ro')
+plt.pcolormesh(Swimmers.xm,Swimmers.ym,ChemStoreSlice[j,:,:]-ChemStoreReg[j,:,:])
+plt.colorbar()
+plt.title(r'Err between Slicing and Regular Update')
 ```
 
 ```{python}
