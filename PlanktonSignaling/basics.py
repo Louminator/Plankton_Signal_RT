@@ -216,6 +216,81 @@ class Plankton(Background_Field):
         self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*(PlankDensity)*f)
         return(self.scalar)
     
+    def UpdateSlice(self, vectors, pos, vel):
+        PlankDensity = self.density*self.L**2/self.num
+        c      = self.scalarInterp(pos)
+        grad_c = self.scalarGrad(pos)
+        self.RT(pos,vel,c,grad_c)
+
+        Std = self.depVar
+        boundaryCutoff = 64*Std
+        intDelta = int((self.N-1)*8*sqrt(Std)/self.L+0.5)
+        f = zeros((self.N,self.N))
+        meshsize = self.N
+        depStr = self.depFcn(c,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
+
+        for p,stren in zip(pos,depStr):
+
+            A, B, C, D = 0,0,0,0
+
+            centerX = int((meshsize-1)*p[0]/self.L+0.5)
+            centerY = int((meshsize-1)*p[1]/self.L+0.5)
+
+            lowerX      = max(0,centerX-intDelta)
+            lowerXplus  = max(0,centerX-intDelta + (meshsize-1))
+            lowerXminus = max(0,centerX-intDelta - (meshsize-1))
+            upperX      = min(meshsize,centerX+intDelta)
+            upperXplus  = min(meshsize,centerX+intDelta + (meshsize-1))
+            upperXminus = min(meshsize,centerX+intDelta - (meshsize-1))
+
+            lowerY      = max(0,centerY-intDelta)
+            lowerYplus  = max(0,centerY-intDelta + (meshsize-1))
+            lowerYminus = max(0,centerY-intDelta - (meshsize-1))
+            upperY      = min(meshsize,centerY+intDelta)
+            upperYplus  = min(meshsize,centerY+intDelta + (meshsize-1))
+            upperYminus = min(meshsize,centerY+intDelta - (meshsize-1))
+            sliceX = slice(lowerX,upperX+1)
+            sliceY = slice(lowerY,upperY+1)
+            f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+            if ((p[0])**2<boundaryCutoff):
+                sliceX = slice(lowerXplus,upperXplus+1)
+                sliceY = slice(lowerY,upperY+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+                A = 1
+            if ((p[0]-self.L)**2<boundaryCutoff):
+                sliceX = slice(lowerXminus,upperXminus+1)
+                sliceY = slice(lowerY,upperY+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]+self.L)**2+(self.ym[sliceY,sliceX]-p[1])**2)/4/Std)
+                B = 1
+            if ((p[1])**2<boundaryCutoff):
+                sliceX = slice(lowerX,upperX+1)
+                sliceY = slice(lowerYplus,upperYplus+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1]-self.L)**2)/4/Std)
+                C = 1
+            if ((p[1]-self.L)**2<boundaryCutoff):
+                sliceX = slice(lowerX,upperX+1)
+                sliceY = slice(lowerYminus,upperYminus+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0])**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
+                D = 1
+            if (A == 1 and C == 1): #Plankton in Lower Left Corner
+                sliceX = slice(lowerXplus,upperXplus+1)
+                sliceY = slice(lowerYplus,upperYplus+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1]-self.L)**2)/4/Std)
+            if (A == 1 and D == 1): #Plankton in Lower Left Corner
+                sliceX = slice(lowerXplus,upperXplus+1)
+                sliceY = slice(lowerYminus,upperYminus+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]-self.L)**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
+            if (B == 1 and C == 1): #Plankton in Upper Right Corner
+                sliceX = slice(lowerXminus,upperXminus+1)
+                sliceY = slice(lowerYplus,upperYplus+1)
+            if (B == 1 and D == 1): #Plankton in Lower Right Corner
+                sliceX = slice(lowerXminus,upperXminus+1)
+                sliceY = slice(lowerYminus,upperYminus+1)
+                f[sliceY,sliceX] = f[sliceY,sliceX] + stren*(1/(4*pi*Std))*exp(-((self.xm[sliceY,sliceX]-p[0]+self.L)**2+(self.ym[sliceY,sliceX]-p[1]+self.L)**2)/4/Std)
+        f = f.reshape((self.N*self.N,))
+        self.scalar = spsolve(self.M1, self.M2.dot(vectors)+self.k*(PlankDensity)*f)
+        return(self.scalar)
+
     def scalarInterp(self,pos):
         bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
         
