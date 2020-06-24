@@ -35,11 +35,11 @@ import time
 Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
 
 ```{python}
-meshsize = 100
-numb = 24**2 #must be a perfect square.
+meshsize = 200
+numb = 30**2 #must be a perfect square.
 LL = 10
 
-Swimmers = PS.Plankton(DP.atanDep2,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
+Swimmers = PS.Plankton(DP.constantDep,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
              lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=0.012)
 
 def initial_conditions(x,y):
@@ -223,6 +223,135 @@ plt.colorbar()
 plt.title(r'Err between Slicing and Regular Update')
 ```
 
+### Testing Update Methods more Formally
+
+```{python}
+NUMB = [10,20,30,40]
+plt.figure()
+for nn in NUMB:
+    meshsize = 200
+    numb = nn**2 #must be a perfect square.
+    LL = 10
+
+    Swimmers = PS.Plankton(DP.constantDep,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
+                 lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=0.012)
+
+    def initial_conditions(x,y):
+        return(0*x+Swimmers.c0)
+
+    simTime = 6
+    Swimmers.SetIC(initial_conditions)
+    lenn = int(np.sqrt(numb))
+    pos = np.zeros((1,2))
+    vel = np.zeros((1,2))
+
+    for l in range(0,lenn):
+        for k in range(0,lenn):
+            pos = np.append(pos,[np.array([np.mod(k*(Swimmers.L*1/(lenn+1)) + 0.5*(Swimmers.L*1/(lenn+1)),Swimmers.L),
+                                            np.mod(l*(Swimmers.L*1/(lenn+1)) + 0.5*(Swimmers.L*1/(lenn+1)),Swimmers.L)])],axis=0)
+            th  = rand()*2*pi
+            vel = np.append(vel,[np.array([np.cos(th),np.sin(th)])],axis=0)
+    pos = np.delete(pos,0,0)
+    vel = np.delete(vel,0,0)
+
+    pos_store = list([pos[:,:]])
+    pos_store = list([np.array(pos)])
+
+    scalar_store = list([Swimmers.Meshed()])
+    aggreg = np.array([0,0])
+
+    for plot in range(0,1):
+        for k in range(0,simTime):
+            Swimmers.Update(Swimmers.scalar,pos,vel)
+            pos_store.append(np.array(pos))
+            scalar_store.append(Swimmers.Meshed())
+
+    ChemStoreReg = np.empty_like(scalar_store)
+    ChemStoreReg[:,:,:] = scalar_store
+    
+    Swimmers2 = PS.Plankton(DP.constantDep,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,speed=1,
+                 lambda0=1,kappa=.2,beta=5,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=0.012)
+    
+    Swimmers2.SetIC(initial_conditions)
+    
+    pos2 = np.zeros((1,2))
+    vel2 = np.zeros((1,2))
+
+    for l in range(0,lenn):
+        for k in range(0,lenn):
+            pos2 = np.append(pos2,[np.array([np.mod(k*(Swimmers2.L*1/(lenn+1)) + 0.5*(Swimmers2.L*1/(lenn+1)),Swimmers2.L),
+                                            np.mod(l*(Swimmers2.L*1/(lenn+1)) + 0.5*(Swimmers2.L*1/(lenn+1)),Swimmers2.L)])],axis=0)
+            th  = rand()*2*pi
+            vel2 = np.append(vel2,[np.array([np.cos(th),np.sin(th)])],axis=0)
+    pos2 = np.delete(pos2,0,0)
+    vel2 = np.delete(vel2,0,0)
+
+    pos_store2 = list([pos2[:,:]])
+    pos_store2 = list([np.array(pos2)])
+
+    scalar_store2 = list([Swimmers2.Meshed()])
+
+    count = 1
+    for plot in range(0,1):
+        for k in range(0,simTime):
+            Swimmers.UpdateSlice(Swimmers2.scalar,pos2,vel2)
+            pos_store2.append(np.array(pos2))
+            scalar_store2.append(Swimmers2.Meshed())
+
+    ChemStoreSlice = np.empty_like(scalar_store2)
+    ChemStoreSlice[:,:,:] = scalar_store2
+    
+    ERR = []
+    for j in range(0,simTime+1):
+        ERR = np.append(ERR,(np.sum(ChemStoreSlice[j,:,:])-np.sum(ChemStoreReg[j,:,:]))/np.sum(ChemStoreReg[j,:,:]))
+    plt.plot(range(0,simTime+1),ERR,label='N = {0}'.format(nn))
+    
+plt.title('Changing N affect on Error')
+plt.xlabel('Time')
+plt.ylabel('Error')
+plt.legend()
+```
+
+```{python}
+#Slice update
+
+Swimmers.SetIC(initial_conditions)
+pos = np.zeros((1,2))
+vel = np.zeros((1,2))
+
+for l in range(0,lenn):
+    for k in range(0,lenn):
+        pos = np.append(pos,[np.array([np.mod(k*(Swimmers.L*1/(lenn+1)) + 0.5*(Swimmers.L*1/(lenn+1)),Swimmers.L),
+                                        np.mod(l*(Swimmers.L*1/(lenn+1)) + 0.5*(Swimmers.L*1/(lenn+1)),Swimmers.L)])],axis=0)
+        th  = rand()*2*pi
+        vel = np.append(vel,[np.array([np.cos(th),np.sin(th)])],axis=0)
+pos = np.delete(pos,0,0)
+vel = np.delete(vel,0,0)
+
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
+
+scalar_store2 = list([Swimmers.Meshed()])
+
+count = 1
+for plot in range(0,1):
+    for k in range(0,simTime):
+        Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+        pos_store.append(np.array(pos))
+        scalar_store2.append(Swimmers.Meshed())
+        
+ChemStoreSlice = np.empty_like(scalar_store2)
+ChemStoreSlice[:,:,:] = scalar_store2
+```
+
+```{python}
+ERR = []
+for j in range(0,simTime+1):
+    ERR = np.append(ERR,(np.sum(ChemStoreSlice[j,:,:])-np.sum(ChemStoreReg[j,:,:]))/np.sum(ChemStoreReg[j,:,:]))
+plt.figure()
+plt.plot(range(0,simTime+1),ERR)
+```
+
 ### Extra Testing
 
 ```{python}
@@ -244,8 +373,8 @@ for plot in range(0,1):
         #Counts the Number of Aggregations at time k
         
         #aggreg = np.vstack((aggreg,[k+1,BD.countingAll(1,255,BD.Contour(Swimmers,pos,400,meshsize))])) 
-np.save('PlanktonPos',pos_store)
-np.save('ChemStore',scalar_store)
+#np.save('PlanktonPos',pos_store)
+#np.save('ChemStore',scalar_store)
 ```
 
 ```{python}
