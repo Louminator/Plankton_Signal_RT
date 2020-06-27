@@ -1,0 +1,63 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+We need to execute the *ipython* magic twice.  We do not know why.  Once is not enough.  If you add a comment before the *ipython* magic, even twice is not enough.
+
+```{python}
+from scipy import *
+import numpy as np
+from numpy.random import rand, uniform
+import matplotlib.pyplot as plt
+import matplotlib.animation
+import PlanktonSignaling.basics as PS
+import PlanktonSignaling.BlobDetection as BD
+import PlanktonSignaling.Deposition as DP
+import profile
+import time
+
+# %matplotlib notebook
+# %matplotlib notebook
+
+# #%load_ext Cython
+```
+
+Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
+
+```{python}
+field = PS.Background_Field(N=200,depMaxStr=.01,Const=3,L=10,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = 30**2, 
+                            c0=0.012,d1=1,d2=0.0)
+
+testFunction = cos((field.xm+pi/10)*4*pi/(field.L+field.h))*cos(field.ym*6*pi/(field.L+field.h))
+
+D2testFunction = -((4*pi/(field.L+field.h))**2 + (6*pi/(field.L+field.h))**2)*cos((field.xm+pi/10)*4*pi/(field.L+field.h))*cos(field.ym*6*pi/(field.L+field.h))
+
+testFunction2 = field.M1.dot(testFunction.reshape(field.N**2,))
+testFunction2 = testFunction2.reshape(field.N,field.N)
+
+err = testFunction2-(testFunction-0.5*(field.d1*field.k)*D2testFunction+0.5*field.k*field.d2*testFunction)
+#err = testFunction2/testFunction
+
+```
+
+```{python}
+plt.figure()
+plt.pcolormesh(field.xm,field.ym,err)
+plt.colorbar()
+#plt.contour(field.xm,field.ym,testFunction)
+plt.show()
+```
+
+```{python}
+
+```

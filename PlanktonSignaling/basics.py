@@ -12,18 +12,21 @@ class Background_Field(object):
     "A class that creates the background concentration field and evolves"
     
     # class builder initiation 
-    def __init__(self,N=30,kappa=1.0e-4,beta=1.0e0,k=0.1,Const=6,L=10,*args,**kwargs):
+    def __init__(self,N=30,k=0.1,lambda0=1e0,Const=6,L=10,d1=0.1,d2=0.1,*args,**kwargs):
                 
-        self.N = N # The number of mesh points
-        self.kappa = kappa
-        self.beta  = beta
-        self.k     = k*self.lambda0 # k is delta t
-        self.L     = L
+        self.N       = N # The number of mesh points
+        self.lambda0 = lambda0
+        self.k       = k*self.lambda0 # k is delta t
+        self.L       = L
+
+        self.d1 = d1
+        self.d2 = d2
         
-        self.d1 = self.kappa*self.lambda0/self.speed**2
-        self.d2 = self.beta/self.lambda0
+        #self.kappa   = kappa
+        #self.beta    = beta
+        #self.d1 = self.kappa*self.lambda0/self.speed**2
+        #self.d2 = self.beta/self.lambda0
         #self.L = self.lambda0/self.speed
-        self.L = L
         self.depVar = Const*self.k*self.d1       #Deposition variable (Gaussian deposition)
         
         self.x = r_[0:self.L:1j*self.N]# setup the spatial mesh. It is a long row vector
@@ -68,13 +71,15 @@ class Background_Field(object):
     def BuildMatrixA1(self):
         diag = ones(self.N)*(1+4*self.alpha/2+self.k*self.d2/2)
         data = np.array([-ones(self.N)*self.alpha/2,-ones(self.N)*self.alpha/2,
-                         diag, -ones(self.N)*self.alpha/2,-ones(self.N)*self.alpha/2]) #off-diag and corners are -alpha
+                         diag, -ones(self.N)*self.alpha/2,-ones(self.N)*self.alpha/2])
+        #off-diag and corners are -alpha
         self.A1 = sp.spdiags(data,[1-self.N,-1,0,1,self.N-1],self.N,self.N)
         
     def BuildMatrixA2(self):
         diag = ones(self.N)*(1-4*self.alpha/2-self.k*self.d2/2)
         data = np.array([ones(self.N)*self.alpha/2, ones(self.N)*self.alpha/2,
-                         diag, ones(self.N)*self.alpha/2, ones(self.N)*self.alpha/2]) #off-diag and corners are alpha
+                         diag, ones(self.N)*self.alpha/2, ones(self.N)*self.alpha/2])
+        #off-diag and corners are alpha
         self.A2 = sp.spdiags(data,[1-self.N,-1,0,1,self.N-1],self.N,self.N)
     
     # Build the big matrices M1 M2 using I, A1 and A2
@@ -91,7 +96,8 @@ class Background_Field(object):
             for j in range(1,self.N):
                 if j == i:
                     buildblock = self.A1
-                elif j == (i-1 % self.N) or j == (i+1 % self.N) or (j==self.N-1 and i==0): # a cheap way to fix
+                elif j == (i-1 % self.N) or j == (i+1 % self.N) or (j==self.N-1 and i==0):
+                    # a cheap way to fix
                     buildblock = -self.I*self.alpha/2
                 else:
                     buildblock = self.E
@@ -112,7 +118,8 @@ class Background_Field(object):
             for j in range(1,self.N):
                 if j == i:
                     buildblock = self.A2
-                elif j == (i-1 % self.N) or j == (i+1 % self.N) or (j==self.N-1 and i==0): # a cheap way to fix
+                elif j == (i-1 % self.N) or j == (i+1 % self.N) or (j==self.N-1 and i==0):
+                    # a cheap way to fix
                     buildblock = self.I*self.alpha/2
                 else:
                     buildblock = self.E
