@@ -41,8 +41,8 @@ def testF(x,y):
 def testD2F(x,y):
     return(-((4*pi/10)**2 + (6*pi/10)**2)*cos((x+pi/10)*4*pi/10)*cos(y*6*pi/10))
 
-field = PS.Background_Field(N=200,depMaxStr=.01,Const=3,L=10,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = 30**2, 
-                            c0=0.012,d1=1,d2=0.0)
+field = PS.Background_Field(N=50,depMaxStr=.01,Const=3,L=10,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = 30**2, 
+                            c0=0.012,d1=1,d2=0.05)
 
 testFunction = testF(field.xm,field.ym)
 
