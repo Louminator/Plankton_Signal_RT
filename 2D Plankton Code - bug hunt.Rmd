@@ -32,7 +32,7 @@ import time
 # #%load_ext Cython
 ```
 
-Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
+### A unit test of the diffusion decay operator.
 
 ```{python}
 def testF(x,y):
@@ -56,6 +56,8 @@ err = testFunction2-(testFunction-0.5*(field.d1*field.k)*D2testFunction+0.5*fiel
 
 ```
 
+#### Plot the error.
+
 ```{python}
 plt.figure()
 plt.pcolormesh(field.xm,field.ym,err)
@@ -63,6 +65,8 @@ plt.colorbar()
 #plt.contour(field.xm,field.ym,testFunction)
 plt.show()
 ```
+
+### Test the BuildPeriodic method for extending the scalar field to include the right and upper boundaries.
 
 ```{python}
 field.scalar = testFunction
@@ -79,7 +83,7 @@ plt.show()
 
 ```{python}
 plt.figure()
-plt.pcolormesh(field.xm,field.ym,field.scalar.reshape((50,50)))
+plt.pcolormesh(field.xm,field.ym,field.scalar)
 plt.colorbar()
 #plt.contour(field.xm,field.ym,testFunction)
 plt.show()
