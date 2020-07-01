@@ -12,34 +12,35 @@ class Background_Field(object):
     "A class that creates the background concentration field and evolves"
     
     # class builder initiation 
-    def __init__(self,N=30,k=0.1,lambda0=1e0,Const=6,L=10,d1=0.1,d2=0.1,*args,**kwargs):
+    def __init__(self,N=30,k=0.1,L=10,d1=0.1,d2=0.1,*args,**kwargs):
                 
         self.N       = N # The number of mesh points
-        self.lambda0 = lambda0
-        self.k       = k*self.lambda0 # k is delta t
+        self.k       = k 
         self.L       = L
 
         self.d1 = d1
         self.d2 = d2
         
-        #self.kappa   = kappa
-        #self.beta    = beta
-        #self.d1 = self.kappa*self.lambda0/self.speed**2
-        #self.d2 = self.beta/self.lambda0
-        #self.L = self.lambda0/self.speed
-        self.depVar = Const*self.k*self.d1       #Deposition variable (Gaussian deposition)
-        
-        self.x = r_[0:self.L:1j*self.N]# setup the spatial mesh. It is a long row vector
+        self.x = r_[0:self.L:self.L/self.N]
+        self.h = self.x[1]-self.x[0] # spatial mesh size
+
+        self.x_periodic = np.append(self.x,self.L)
+        self.y_periodic = 1*self.x_periodic
 
         # Create some local coordinates for the square domain.
         self.y = 1*self.x
         self.xm,self.ym = np.meshgrid(self.x,self.y)
+
+        self.xm_periodic,self.ym_periodic = np.meshgrid(self.x_periodic,self.y_periodic)
         
         self.scalar = self.x
         for counter in range(0,self.N-1):
             self.scalar = np.append(self.scalar,self.x)
+
+        self.scalar_periodic = self.x_periodic
+        for counter in range(0,self.N):
+            self.scalar_periodic = np.append(self.scalar_periodic,self.x_periodic)        
         
-        self.h = self.x[1]-self.x[0] # spacial mesh size
         self.SetAlpha()
         self.BuildMatrixA1()
         self.BuildMatrixA2()
@@ -62,7 +63,16 @@ class Background_Field(object):
         
     def Meshed(self):
         return(self.scalar.reshape((self.N,self.N)))
-        
+
+    def BuildPeriodic(self):
+        s                     = self.scalar.reshape((self.N,self.N))
+        sp                    = self.scalar_periodic.reshape((self.N+1,self.N+1))
+        sp[0:self.N,0:self.N] = s[:,:]
+        sp[self.N,0:self.N]   = sp[0,0:self.N]
+        sp[0:self.N,self.N]   = sp[0:self.N,0]
+        sp[self.N,self.N]     = sp[0,0]
+        self.scalar_periodic  = self.scalar_periodic.reshape(((self.N+1),(self.N+1)))
+    
     # Compute alpha
     def SetAlpha(self):
         self.alpha = self.d1*self.k/(self.h)**2
@@ -150,6 +160,14 @@ class Plankton(Background_Field):
 
         self.lambda0 = lambda0
         self.speed = speed
+        self.kappa   = kappa
+        self.beta    = beta
+        self.k       = k*self.lambda0 # k is delta t
+        self.d1 = self.kappa*self.lambda0/self.speed**2
+        self.d2 = self.beta/self.lambda0
+        self.L = self.lambda0/self.speed
+        self.depVar = Const*self.k*self.d1       #Deposition variable (Gaussian deposition)
+
         self.depMaxStr = depMaxStr #Deposition maximum strength
         self.depFcn = depFcn
         self.depTransWidth = depTransWidth

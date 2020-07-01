@@ -35,12 +35,18 @@ import time
 Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
 
 ```{python}
+def testF(x,y):
+    return(cos((x+pi/10)*4*pi/10)*cos(y*6*pi/10))
+
+def testD2F(x,y):
+    return(-((4*pi/10)**2 + (6*pi/10)**2)*cos((x+pi/10)*4*pi/10)*cos(y*6*pi/10))
+
 field = PS.Background_Field(N=200,depMaxStr=.01,Const=3,L=10,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = 30**2, 
                             c0=0.012,d1=1,d2=0.0)
 
-testFunction = cos((field.xm+pi/10)*4*pi/(field.L+field.h))*cos(field.ym*6*pi/(field.L+field.h))
+testFunction = testF(field.xm,field.ym)
 
-D2testFunction = -((4*pi/(field.L+field.h))**2 + (6*pi/(field.L+field.h))**2)*cos((field.xm+pi/10)*4*pi/(field.L+field.h))*cos(field.ym*6*pi/(field.L+field.h))
+D2testFunction = testD2F(field.xm,field.ym)
 
 testFunction2 = field.M1.dot(testFunction.reshape(field.N**2,))
 testFunction2 = testFunction2.reshape(field.N,field.N)
@@ -53,6 +59,27 @@ err = testFunction2-(testFunction-0.5*(field.d1*field.k)*D2testFunction+0.5*fiel
 ```{python}
 plt.figure()
 plt.pcolormesh(field.xm,field.ym,err)
+plt.colorbar()
+#plt.contour(field.xm,field.ym,testFunction)
+plt.show()
+```
+
+```{python}
+field.scalar = testFunction
+field.BuildPeriodic()
+```
+
+```{python}
+plt.figure()
+plt.pcolormesh(field.xm_periodic,field.ym_periodic,field.scalar_periodic)
+plt.colorbar()
+#plt.contour(field.xm,field.ym,testFunction)
+plt.show()
+```
+
+```{python}
+plt.figure()
+plt.pcolormesh(field.xm,field.ym,field.scalar.reshape((50,50)))
 plt.colorbar()
 #plt.contour(field.xm,field.ym,testFunction)
 plt.show()
