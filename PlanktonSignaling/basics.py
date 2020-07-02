@@ -12,7 +12,7 @@ class Background_Field(object):
     "A class that creates the background concentration field and evolves"
     
     # class builder initiation 
-    def __init__(self,N=30,k=0.1,L=10,d1=0.1,d2=0.1,*args,**kwargs):
+    def __init__(self,N=30,L=10,d1=0.1,d2=0.1,k=0.1,*args,**kwargs):
                 
         self.N       = N # The number of mesh points
         self.k       = k 
@@ -62,7 +62,7 @@ class Background_Field(object):
         self.scalar = ic
         
     def Meshed(self):
-        return(self.scalar.reshape((self.N,self.N)))
+        return(np.roll(self.scalar.reshape((self.N,self.N)),int()))
 
     def BuildPeriodic(self):
         s                     = self.scalar.reshape((self.N,self.N))
@@ -156,16 +156,12 @@ class Background_Field(object):
 
 class Plankton(Background_Field):
     
-    def __init__(self,depFcn,lambda0=1e0,speed=0.1,depMaxStr=1.0e-10,epsilon=1.0e-8,depTransWidth=0.001,depThreshold=0.008,num = 400,c0=0.012,*args,**kwargs):
-
-        self.lambda0 = lambda0
-        self.speed = speed
-        self.kappa   = kappa
-        self.beta    = beta
-        self.k       = k*self.lambda0 # k is delta t
-        self.d1 = self.kappa*self.lambda0/self.speed**2
-        self.d2 = self.beta/self.lambda0
-        self.L = self.lambda0/self.speed
+    def __init__(self,depFcn,d1=0.1,d2=0.1,k=0.02,Const = 3,depMaxStr=1.0e-10,epsilon=1.0e-8,
+                 depTransWidth=0.001,depThreshold=0.008,num = 400,c0=0.012,*args,**kwargs):
+        
+        self.k       = k #k is delta t
+        self.d1 = d1
+        self.d2 = d2
         self.depVar = Const*self.k*self.d1       #Deposition variable (Gaussian deposition)
 
         self.depMaxStr = depMaxStr #Deposition maximum strength
@@ -179,7 +175,7 @@ class Plankton(Background_Field):
         
         self.epsilon = epsilon
 
-        super(Plankton,self).__init__(*args,**kwargs)
+        super(Plankton,self).__init__(d1=self.d1, d2=self.d2,k=self.k,*args,**kwargs)
         self.density = self.d2*self.c0/self.depFcn(self.c0,self.depMaxStr,self.depThreshold,self.depTransWidth)
             
     def RT(self,pos,vel,c,grad_c):
@@ -197,7 +193,7 @@ class Plankton(Background_Field):
         PlankDensity = self.density*self.L**2/self.num
         c      = self.scalarInterp(pos)
         grad_c = self.scalarGrad(pos)
-        self.RT(pos,vel,c,grad_c)
+        #self.RT(pos,vel,c,grad_c)
         
         depStr = self.depFcn(c,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
         f = zeros((self.N,self.N))
@@ -245,7 +241,7 @@ class Plankton(Background_Field):
         PlankDensity = self.density*self.L**2/self.num
         c      = self.scalarInterp(pos)
         grad_c = self.scalarGrad(pos)
-        self.RT(pos,vel,c,grad_c)
+        #self.RT(pos,vel,c,grad_c)
 
         Std = self.depVar
         boundaryCutoff = 64*Std
@@ -318,7 +314,8 @@ class Plankton(Background_Field):
         return(self.scalar)
 
     def scalarInterp(self,pos):
-        bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
+        self.BuildPeriodic()
+        bspline = RectBivariateSpline(self.x_periodic,self.y_periodic,self.scalar_periodic)
         
         # Flipping x and y inputs because self.Meshed() has reversed row
         # major formatting which goes back to meshgrid which goes back to
@@ -329,9 +326,11 @@ class Plankton(Background_Field):
         return(bspline.ev(pos[:,1],pos[:,0]))
 
     # Assumes a [0,L]x[0,L] domain.
+    #Fixing Periodic BCs
     def scalarGrad(self,xp,dx=1.0e-4):
         dx = dx*self.L
-        bspline = RectBivariateSpline(self.x,self.y,self.Meshed())
+        self.BuildPeriodic()
+        bspline = RectBivariateSpline(self.x_periodic,self.y_periodic,self.scalar_periodic)
         p       = array([mod(xp + array([dx,0]),self.L),mod(xp - array([dx,0]),self.L),mod(xp + array([0,dx]),self.L),
                                       mod(xp - array([0,dx]),self.L)])
 
