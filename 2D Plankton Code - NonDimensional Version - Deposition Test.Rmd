@@ -1,0 +1,276 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: Python [Root]
+    language: python
+    name: Python [Root]
+---
+
+We need to execute the *ipython* magic twice.  We do not know why.  Once is not enough.  If you add a comment before the *ipython* magic, even twice is not enough.
+
+```{python}
+from scipy import *
+import numpy as np
+from numpy.random import rand, uniform
+import matplotlib.pyplot as plt
+import matplotlib.animation
+import PlanktonSignaling.basics as PS
+
+## Note the Change in basics! The plankton will not move in this simulation. If you want the plankton to move,
+## delete the comments in the 4th line of the Update and UpdateSlice commands. 
+
+import PlanktonSignaling.BlobDetection as BD
+import PlanktonSignaling.Deposition as DP
+import profile
+import time
+import copy
+
+# %matplotlib notebook
+# %matplotlib notebook
+
+# #%load_ext Cython
+```
+
+Note here that $d_1 = \frac{\kappa \lambda_0}{v^2}$ and $d_2 = \frac{\beta}{\lambda_0}$. For the correct deposition functions, use linAtanDep2 and atanDep2 to include tanh.
+
+
+### Deposition Test
+
+```{python}
+def BuildPeriodic(Mat):
+    mgf                   = copy.deepcopy(Swimmers.scalar_periodic)
+    s                     = Mat.reshape((Swimmers.N,Swimmers.N))
+    sp                    = mgf.reshape((Swimmers.N+1,Swimmers.N+1))
+    sp[0:Swimmers.N,0:Swimmers.N] = s[:,:]
+    sp[Swimmers.N,0:Swimmers.N]   = sp[0,0:Swimmers.N]
+    sp[0:Swimmers.N,Swimmers.N]   = sp[0:Swimmers.N,0]
+    sp[Swimmers.N,Swimmers.N]     = sp[0,0]
+    mgf  = mgf.reshape(((Swimmers.N+1),(Swimmers.N+1)))
+    return(mgf)
+```
+
+```{python}
+meshsize = 201
+numb = 1 #must be a perfect square.
+LL = 10
+
+Swimmers = PS.Plankton(DP.constantDep,d1=0.2,d2=5,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=0.012)
+
+def initial_conditions(x,y):
+    return(0*x+Swimmers.c0)
+
+print(Swimmers.d1)
+print(Swimmers.d2)
+```
+
+### Center Test
+
+```{python}
+# %matplotlib notebook
+
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization here
+pos = np.zeros((1,2))
+vel = np.zeros((1,2))
+
+lenn= int(np.sqrt(numb))
+th = rand()*2*pi
+mx = (Swimmers.y_periodic[int(len(Swimmers.x_periodic)/2)-1] + Swimmers.x_periodic[int(len(Swimmers.x_periodic)/2)])/2
+my = (Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)-1] + Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)])/2
+
+pos[0,:] = np.array([mx,my])
+vel[0,:] = np.array([np.cos(th),np.sin(th)])
+
+
+plt.figure()
+Swimmers.BuildPeriodic()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Swimmers.scalar_periodic)
+plt.plot(pos[:,0],pos[:,1],'r.',MarkerSize=15)
+plt.xlim([0,10])
+plt.ylim([0,10])
+plt.show()
+print(pos)
+```
+
+```{python}
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
+
+scalar_store = list([Swimmers.Meshed()])
+simTime = 1
+
+for k in range(0,simTime):
+    Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+    pos_store.append(np.array(pos))
+    scalar_store.append(Swimmers.Meshed())
+    
+Center = copy.deepcopy(BuildPeriodic(Swimmers.Meshed()))
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Center)
+
+plt.colorbar()
+plt.title('Center Placed Agent')
+plt.xlim(4,6)
+plt.ylim(4,6)
+```
+
+### Right Test
+
+```{python}
+# %matplotlib notebook
+
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization here
+pos = np.zeros((1,2))
+vel = np.zeros((1,2))
+
+lenn= int(np.sqrt(numb))
+th = rand()*2*pi
+mx = (Swimmers.y_periodic[-1] + Swimmers.y_periodic[-2])/2
+my = (Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)-1] + Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)])/2
+
+pos[0,:] = np.array([mx,my])
+vel[0,:] = np.array([np.cos(th),np.sin(th)])
+
+
+plt.figure()
+Swimmers.BuildPeriodic()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Swimmers.scalar_periodic)
+plt.plot(pos[:,0],pos[:,1],'r.',MarkerSize=15)
+plt.xlim([0,10])
+plt.ylim([0,10])
+plt.show()
+print(pos)
+```
+
+```{python}
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
+
+scalar_store = list([Swimmers.Meshed()])
+simTime = 1
+
+for k in range(0,simTime):
+    Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+    pos_store.append(np.array(pos))
+    scalar_store.append(Swimmers.Meshed())
+    
+Right = copy.deepcopy(BuildPeriodic(Swimmers.Meshed()))
+RightShift = copy.deepcopy(BuildPeriodic(np.roll(Swimmers.Meshed(),-int(len(Swimmers.xm)/2),axis=1)))
+
+print('Relative Error in Total Chemical Between Center and Right: {0}'.format((np.sum(Right)-np.sum(Center))/np.sum(Center)))
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Right)
+
+plt.colorbar()
+plt.title('Right Placed Agent')
+plt.xlim(0,10)
+plt.ylim(0,10)
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,RightShift)
+
+plt.colorbar()
+plt.title('Shifted Agent')
+plt.xlim(0,10)
+plt.ylim(0,10)
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,RightShift-Center)
+
+plt.colorbar()
+plt.title('Shifted Agent, Error (Shifted - Center)')
+plt.xlim(4,6)
+plt.ylim(4,6)
+```
+
+### Top Test
+
+```{python}
+# %matplotlib notebook
+
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization here
+pos = np.zeros((1,2))
+vel = np.zeros((1,2))
+
+lenn= int(np.sqrt(numb))
+th = rand()*2*pi
+mx = (Swimmers.y_periodic[-1] + Swimmers.y_periodic[-2])/2
+my = (Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)-1] + Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)])/2
+
+pos[0,:] = np.array([my,mx])
+vel[0,:] = np.array([np.cos(th),np.sin(th)])
+
+
+plt.figure()
+Swimmers.BuildPeriodic()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Swimmers.scalar_periodic)
+plt.plot(pos[:,0],pos[:,1],'r.',MarkerSize=15)
+plt.xlim([0,10])
+plt.ylim([0,10])
+plt.show()
+print(pos)
+```
+
+```{python}
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
+
+scalar_store = list([Swimmers.Meshed()])
+simTime = 1
+
+for k in range(0,simTime):
+    Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+    pos_store.append(np.array(pos))
+    scalar_store.append(Swimmers.Meshed())
+    
+Top = copy.deepcopy(BuildPeriodic(Swimmers.Meshed()))
+TopShift = copy.deepcopy(BuildPeriodic(np.roll(Swimmers.Meshed(),-int(len(Swimmers.xm)/2),axis=0)))
+
+print('Relative Error in Total Chemical Between Center and Top: {0}'.format((np.sum(Top)-np.sum(Center))/np.sum(Center)))
+print('Relative Error in Total Chemical Between Right and Top: {0}'.format((np.sum(Top)-np.sum(Right))/np.sum(Right)))
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Top)
+
+plt.colorbar()
+plt.title('Top Placed Agent')
+plt.xlim(0,10)
+plt.ylim(0,10)
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,TopShift)
+
+plt.colorbar()
+plt.title('Shifted Agent')
+plt.xlim(0,10)
+plt.ylim(0,10)
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,TopShift-Center)
+
+plt.colorbar()
+plt.title('Shifted Agent, Error (Shifted - Center)')
+plt.xlim(4,6)
+plt.ylim(4,6)
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,TopShift-RightShift)
+
+plt.colorbar()
+plt.title('Shifted Agents, Error (Top - Right)')
+plt.xlim(4,6)
+plt.ylim(4,6)
+```
