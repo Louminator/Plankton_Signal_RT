@@ -60,7 +60,8 @@ meshsize = 201
 numb = 1 #must be a perfect square.
 LL = 10
 
-Swimmers = PS.Plankton(DP.constantDep,d1=0.2,d2=5,N = meshsize,depMaxStr=.01,Const=3,L=LL,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=0.012)
+Swimmers = PS.Plankton(DP.constantDep,d1=0.2,d2=5,N = meshsize,depMaxStr=.01,
+                       Const=3,L=LL,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=1e-10)
 
 def initial_conditions(x,y):
     return(0*x+Swimmers.c0)
@@ -112,20 +113,24 @@ for k in range(0,simTime):
     scalar_store.append(Swimmers.Meshed())
     
 Center = copy.deepcopy(BuildPeriodic(Swimmers.Meshed()))
+CenterS = copy.deepcopy(scalar_store[1])
+
 
 plt.figure()
 plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Center)
 
 plt.colorbar()
 plt.title('Center Placed Agent')
-plt.xlim(4,6)
-plt.ylim(4,6)
+#plt.xlim(4,6)
+#plt.ylim(4,6)
 ```
 
 ### Right Test
 
 ```{python}
 # %matplotlib notebook
+Swimmers = PS.Plankton(DP.constantDep,d1=0.2,d2=5,N = meshsize,depMaxStr=.01,
+                       Const=3,L=LL,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=1e-10)
 
 Swimmers.SetIC(initial_conditions)
 
@@ -166,8 +171,11 @@ for k in range(0,simTime):
     
 Right = copy.deepcopy(BuildPeriodic(Swimmers.Meshed()))
 RightShift = copy.deepcopy(BuildPeriodic(np.roll(Swimmers.Meshed(),-int(len(Swimmers.xm)/2),axis=1)))
+RightS = copy.deepcopy(scalar_store[1])
+
 
 print('Relative Error in Total Chemical Between Center and Right: {0}'.format((np.sum(Right)-np.sum(Center))/np.sum(Center)))
+print('Relative Error in Total Chemical Between Center and Right: {0}'.format((np.sum(RightS)-np.sum(CenterS))/np.sum(CenterS)))
 
 plt.figure()
 plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Right)
@@ -190,8 +198,9 @@ plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,RightShift-Center)
 
 plt.colorbar()
 plt.title('Shifted Agent, Error (Shifted - Center)')
-plt.xlim(4,6)
-plt.ylim(4,6)
+#plt.xlim(4,6)
+#plt.clim(0,1e-11)
+#plt.ylim(4,6)
 ```
 
 ### Top Test
@@ -238,9 +247,12 @@ for k in range(0,simTime):
     
 Top = copy.deepcopy(BuildPeriodic(Swimmers.Meshed()))
 TopShift = copy.deepcopy(BuildPeriodic(np.roll(Swimmers.Meshed(),-int(len(Swimmers.xm)/2),axis=0)))
+TopS = copy.deepcopy(scalar_store[1])
+
 
 print('Relative Error in Total Chemical Between Center and Top: {0}'.format((np.sum(Top)-np.sum(Center))/np.sum(Center)))
-print('Relative Error in Total Chemical Between Right and Top: {0}'.format((np.sum(Top)-np.sum(Right))/np.sum(Right)))
+print('Relative Error in Total Chemical Between Right and Top: {0}'.format((np.sum(TopS)-np.sum(RightS))/np.sum(RightS)))
+print('Relative Error in Total Chemical Between Center and Top: {0}'.format((np.sum(TopS)-np.sum(CenterS))/np.sum(CenterS)))
 
 plt.figure()
 plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Top)
@@ -271,6 +283,93 @@ plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,TopShift-RightShift)
 
 plt.colorbar()
 plt.title('Shifted Agents, Error (Top - Right)')
+plt.xlim(4,6)
+plt.ylim(4,6)
+```
+
+### Slicing and Regular Update Test
+
+```{python}
+meshsize = 201
+numb = 1 #must be a perfect square.
+LL = 10
+
+Swimmers = PS.Plankton(DP.constantDep,d1=0.2,d2=5,N = meshsize,depMaxStr=.01,
+                       Const=3,L=LL,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=1e-10)
+
+def initial_conditions(x,y):
+    return(0*x+Swimmers.c0)
+
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization here
+pos = np.zeros((1,2))
+vel = np.zeros((1,2))
+
+lenn= int(np.sqrt(numb))
+th = rand()*2*pi
+mx = (Swimmers.y_periodic[int(len(Swimmers.x_periodic)/2)-1] + Swimmers.x_periodic[int(len(Swimmers.x_periodic)/2)])/2
+my = (Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)-1] + Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)])/2
+
+pos[0,:] = np.array([mx,my])
+vel[0,:] = np.array([np.cos(th),np.sin(th)])
+
+
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
+
+scalar_store = list([Swimmers.Meshed()])
+simTime = 1
+
+for k in range(0,simTime):
+    Swimmers.Update(Swimmers.scalar,pos,vel)
+    pos_store.append(np.array(pos))
+    scalar_store.append(Swimmers.Meshed())
+    
+Reg = copy.deepcopy(scalar_store[1])
+
+meshsize = 201
+numb = 1 #must be a perfect square.
+LL = 10
+
+Swimmers = PS.Plankton(DP.constantDep,d1=0.2,d2=5,N = meshsize,depMaxStr=.01,
+                       Const=3,L=LL,k=0.02,epsilon=1e-3,depThreshold=0.05, depTransWidth=0.03, num = numb, c0=1e-10)
+
+Swimmers.SetIC(initial_conditions)
+
+#Fixed the initialization here
+pos = np.zeros((1,2))
+vel = np.zeros((1,2))
+
+lenn= int(np.sqrt(numb))
+th = rand()*2*pi
+mx = (Swimmers.y_periodic[int(len(Swimmers.x_periodic)/2)-1] + Swimmers.x_periodic[int(len(Swimmers.x_periodic)/2)])/2
+my = (Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)-1] + Swimmers.y_periodic[int(len(Swimmers.y_periodic)/2)])/2
+
+pos[0,:] = np.array([mx,my])
+vel[0,:] = np.array([np.cos(th),np.sin(th)])
+
+pos_store = list([pos[:,:]])
+pos_store = list([np.array(pos)])
+
+scalar_store = list([Swimmers.Meshed()])
+simTime = 1
+
+for k in range(0,simTime):
+    Swimmers.UpdateSlice(Swimmers.scalar,pos,vel)
+    pos_store.append(np.array(pos))
+    scalar_store.append(Swimmers.Meshed())
+    
+Slice = copy.deepcopy(scalar_store[1])
+
+
+print('Relative Error: {0}'.format((np.sum(Reg)-np.sum(Slice))/np.sum(Slice)))
+
+plt.figure()
+plt.pcolormesh(Swimmers.xm_periodic,Swimmers.ym_periodic,Reg-Slice)
+
+plt.colorbar()
+plt.title('Regular - Slice')
 plt.xlim(4,6)
 plt.ylim(4,6)
 ```
