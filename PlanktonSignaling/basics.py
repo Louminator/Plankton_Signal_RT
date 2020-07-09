@@ -193,7 +193,7 @@ class Plankton(Background_Field):
         PlankDensity = self.density*self.L**2/self.num
         c      = self.scalarInterp(pos)
         grad_c = self.scalarGrad(pos)
-        #self.RT(pos,vel,c,grad_c)
+        self.RT(pos,vel,c,grad_c)
         
         depStr = self.depFcn(c,self.depMaxStr,self.depThreshold,self.depTransWidth,*self.args,**self.kwargs)
         f = zeros((self.N,self.N))
@@ -241,7 +241,7 @@ class Plankton(Background_Field):
         PlankDensity = self.density*self.L**2/self.num
         c      = self.scalarInterp(pos)
         grad_c = self.scalarGrad(pos)
-        #self.RT(pos,vel,c,grad_c)
+        self.RT(pos,vel,c,grad_c)
 
         Std = self.depVar
         boundaryCutoff = 64*Std
